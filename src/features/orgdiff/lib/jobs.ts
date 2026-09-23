@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import type { AnalysisJob } from '../types';
-import { analyze, pendingTrace, type DocInput } from './analyze';
+import { analyze, IncomparableError, pendingTrace, type DocInput } from './analyze';
 
 /** Задачи анализа в памяти процесса; globalThis переживает hot reload в dev. */
 const g = globalThis as unknown as { __orgdiffJobs?: Map<string, AnalysisJob> };
@@ -23,6 +23,7 @@ export function startJob(docs: DocInput[]): string {
     .catch((e: unknown) => {
       job.status = 'error';
       job.error = e instanceof Error ? e.message : String(e);
+      if (e instanceof IncomparableError) job.errorCode = e.code;
     });
   return id;
 }

@@ -17,6 +17,7 @@ import { buildFunctions, clauseUid, holderLabel, sameHolders, type Fn } from './
 import {
   extractUnitsLLM,
   findConflicts,
+  judgeComparability,
   judgeDuplicates,
   suggestRecipients,
   judgeMatches,
@@ -54,6 +55,7 @@ export const PIPELINE_STEPS = [
   { id: 'functions', label: 'Извлечение функций и их носителей' },
   { id: 'align', label: 'Выравнивание неизменённых пунктов' },
   { id: 'embed', label: 'Семантические векторы пунктов' },
+  { id: 'relevance', label: 'Проверка сопоставимости комплектов «до» и «после»' },
   { id: 'match', label: 'ИИ-сопоставление изменённых функций' },
   { id: 'recheck', label: 'Самопроверка потерь по всему документу' },
   { id: 'duplicates', label: 'Поиск дублирования и пересечения функций' },
@@ -202,6 +204,37 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
       return map;
     },
     (r) => `${r.size} векторов`
+  );
+
+  // 5б. Сопоставимы ли комплекты: иначе анализ не проводится (ошибка загрузки, разные подразделения и т.п.).
+  await step(
+    'relevance',
+    'Проверка сопоставимости комплектов «до» и «после»',
+    async () => {
+      const afterVecs = afterAll.map((f) => vectors.get(f.uid)).filter((v): v is number[] => !!v);
+      let covered = exact.size;
+      for (const f of changedBefore) {
+        const v = vectors.get(f.uid);
+        if (v && afterVecs.some((a) => cosine(v, a) >= RELEVANCE_COS)) covered++;
+      }
+      const total = fns.before.length;
+      const exactShare = total ? exact.size / total : 0;
+      const coverage = total ? covered / total : 0;
+      const afterKeys = new Set(structure.after.map((u) => u.key));
+      const sharedUnits = structure.before.filter((u) => afterKeys.has(u.key)).length;
+      const signals = `дословно совпало ${Math.round(exactShare * 100)}% функций, по смыслу покрыто ${Math.round(coverage * 100)}%, общих подразделений: ${sharedUnits}`;
+
+      if (exactShare >= 0.15 || coverage >= 0.45 || (sharedUnits > 0 && coverage >= 0.25)) return `сопоставимы: ${signals}`;
+      const verdict =
+        coverage < 0.15 && sharedUnits === 0
+          ? { comparable: false, reason: `Документы почти не пересекаются по содержанию (${signals}).` }
+          : await judgeComparability(setSummary(parsed.before, structure.before, meta), setSummary(parsed.after, structure.after, meta));
+      if (verdict.comparable) return `сопоставимы по оценке ИИ: ${verdict.reason} (${signals})`;
+      throw new IncomparableError(
+        `Комплекты «до» и «после» нельзя сравнить: ${verdict.reason.replace(/\.$/, '')}. Загрузите документы одного и того же подразделения (структуры) до и после реорганизации.`
+      );
+    },
+    (r) => r
   );
 
   const score = (a: Fn, b: Fn) => cosine(vectors.get(a.uid)!, vectors.get(b.uid)!) + 0.3 * jaccard(a.clause.text, b.clause.text);
@@ -964,6 +997,33 @@ function redistribution(fn: Fn, rs: Recipient[], reason?: string): Pick<Finding,
       { before: ev(fn.clause), after: ev(first.clause.clause), note: `ближайшая функция предлагаемого получателя — ${name(first.unit)}` }
     ]
   };
+}
+
+/** Порог смыслового совпадения пункта «до» с каким-либо пунктом «после» для проверки сопоставимости. */
+const RELEVANCE_COS = 0.6;
+
+/** Комплекты не относятся к одному объекту — анализ не проводится, пользователь получает объяснение. */
+export class IncomparableError extends Error {
+  readonly code = 'incomparable' as const;
+}
+
+/** Краткое описание комплекта для судьи сопоставимости: названия, разделы, состав, примеры пунктов. */
+function setSummary(clauses: ParsedClause[], units: UnitDef[], meta: Map<string, { title?: string }>): string {
+  const docs = [...new Set(clauses.map((c) => c.docName))];
+  const titles = docs.map((d) => `«${meta.get(`${clauses.find((c) => c.docName === d)!.side}:${d}`)?.title ?? d}»`);
+  const sections = [...new Set(clauses.map((c) => c.sectionTitle))].slice(0, 15);
+  const samples = clauses
+    .filter((c) => c.text.length > 60)
+    .filter((_, i, arr) => i % Math.max(1, Math.floor(arr.length / 12)) === 0)
+    .slice(0, 12)
+    .map((c) => `— п. ${c.id}: ${clip(c.text, 160)}`);
+  return [
+    `Документы: ${titles.join('; ')}`,
+    `Разделы: ${sections.join('; ')}`,
+    `Подразделения: ${units.map((u) => u.abbr ?? u.name).join(', ') || 'не выделены'}`,
+    'Примеры пунктов:',
+    ...samples
+  ].join('\n');
 }
 
 const flowKey = (f: UnitFlow) => `${f.from.replace(/^u-/, '')}→${f.to.replace(/^u-/, '')}`;

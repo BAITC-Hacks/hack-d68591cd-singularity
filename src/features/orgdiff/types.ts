@@ -298,4 +298,6 @@ export interface AnalysisJob {
   trace: TraceStep[];
   result?: AnalysisResult;
   error?: string;
+  /** incomparable — комплекты «до» и «после» не относятся к одному объекту, сравнение не проводилось */
+  errorCode?: 'incomparable';
 }
