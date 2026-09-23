@@ -21,8 +21,12 @@ const openai = () => {
 
 const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex').slice(0, 24);
 
+/** Файлы кэша, к которым обращался текущий процесс, — для чистки устаревших (bun run eval --prune). */
+export const usedCacheFiles = new Set<string>();
+
 async function cached<T>(kind: string, key: unknown, produce: () => Promise<T>): Promise<{ value: T; hit: boolean }> {
   const file = path.join(CACHE_DIR, kind, `${hash(key)}.json`);
+  usedCacheFiles.add(file);
   try {
     return { value: JSON.parse(await readFile(file, 'utf-8')) as T, hit: true };
   } catch {

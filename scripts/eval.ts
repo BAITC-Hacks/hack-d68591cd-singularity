@@ -3,14 +3,17 @@
  *
  * 1. Эталон по тестовой паре организатора (ред. 8 → ред. 9): ключевые случаи из ручной экспертной разметки.
  * 2. Контрольный комплект с заранее известными изменениями: ред. 9 мутируется детерминированно —
- *    удаляется функция, одна функция дублируется в другой департамент, ДККМ переименовывается в ДМК.
+ *    удаляется функция (обучение работников), одна функция дублируется в другой департамент, ДККМ переименовывается в ДМК.
  *    Мутированный документ сохраняется в data/control/ — его можно загрузить и через интерфейс.
  *
- *   bun run eval
+ *   bun run eval             — проверка
+ *   bun run eval --prune     — ещё и удалить из data/cache ответы, не нужные текущим промптам
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import path from 'path';
 import { analyze } from '../src/features/orgdiff/lib/analyze';
 import { demoDocs } from '../src/features/orgdiff/lib/jobs';
+import { usedCacheFiles } from '../src/features/orgdiff/lib/llm';
 import type { AnalysisResult, Finding } from '../src/features/orgdiff/types';
 
 let passed = 0;
@@ -58,8 +61,8 @@ const mutate = (from: string | RegExp, to: string) => {
   if (next === text) throw new Error(`Мутация не применилась: ${from}`);
   text = next;
 };
-// C1. Потеря функции: у ДККМ удалена разработка методологии (в ред. 8 — п. 5.5.6).
-mutate(/^5\.5\.4\. разрабатывает методические материалы.*\n/m, '');
+// C1. Потеря функции: у ДККМ удалено обучение работников БВА (в ред. 8 — п. 5.5.9).
+mutate(/^5\.5\.6\. организует обучение работников БВА.*\n/m, '');
 // C2. Дублирование: ДНМ получает оценку качества внутреннего аудита, которая уже есть у ДККМ (п. 5.5.2).
 mutate(
   /^(5\.4\.10\. осуществляет выполнение прочих поручений Главного аудитора\.)$/m,
@@ -77,7 +80,7 @@ const control = await analyze([
   { side: 'after', name: 'after_red9_control.txt', buffer: Buffer.from(text, 'utf-8') }
 ]);
 
-check('C1 потеря функции: разработка методологии (до п. 5.5.6)', !!findingWith(control, ['function_lost'], 'before', '5.5.6'));
+check('C1 потеря функции: обучение работников БВА (до п. 5.5.9)', !!findingWith(control, ['function_lost'], 'before', '5.5.9'));
 check(
   'C2 дублирование: оценка качества у ДНМ (п. 5.4.11) и ДМК (п. 5.5.2)',
   !!control.findings.find((f) => ['function_duplicated', 'responsibility_overlap'].includes(f.kind) && cites(f, 'after', '5.4.11'))
@@ -89,6 +92,19 @@ check(
     !!control.findings.find((f) => f.kind === 'unit_reorganized' && f.unitIds.includes(unit(control, 'ДККМ')!.id))
 );
 check('Все цитаты найдены в текстах пунктов', citationRate(control) === 1, `${(citationRate(control) * 100).toFixed(0)}%`);
+
+if (process.argv.includes('--prune')) {
+  let removed = 0;
+  for (const kind of ['llm', 'emb']) {
+    const dir = path.join(process.cwd(), 'data', 'cache', kind);
+    for (const f of readdirSync(dir)) {
+      if (usedCacheFiles.has(path.join(dir, f))) continue;
+      rmSync(path.join(dir, f));
+      removed++;
+    }
+  }
+  console.log(`\nКэш: удалено устаревших файлов — ${removed}`);
+}
 
 console.log(`\nИтого: ${passed}/${passed + failed} проверок пройдено`);
 process.exit(failed ? 1 : 0);
