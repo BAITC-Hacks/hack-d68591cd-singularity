@@ -18,10 +18,11 @@ export const ACCEPTED_FILES = {
   'application/pdf': ['.pdf'],
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
   'image/png': ['.png'],
-  'image/jpeg': ['.jpg', '.jpeg']
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'text/plain': ['.txt']
 };
 
-export const ACCEPTED_EXTENSIONS_LABEL = '.docx, .pdf, .xlsx, .png, .jpg';
+export const ACCEPTED_EXTENSIONS_LABEL = '.docx, .pdf, .xlsx, .png, .jpg, .txt';
 
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
 

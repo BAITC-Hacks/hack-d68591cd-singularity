@@ -723,6 +723,24 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
   // --- подразделения
   const keys = [...new Set([...structure.before, ...structure.after].map((u) => u.key))];
   const unitPairs = new Map<string, EvidencePair[]>();
+  // Преобразование/переименование: большая часть функций упразднённого подразделения ушла в одно новое.
+  const beforeKeys = new Set(structure.before.map((u) => u.key));
+  const afterKeys = new Set(structure.after.map((u) => u.key));
+  const transformedInto = new Map<string, string>();
+  for (const key of keys) {
+    if (!beforeKeys.has(key) || afterKeys.has(key)) continue;
+    // Преемник — новое подразделение, получившее заметно больше функций, чем любое другое
+    // (общие для всех департаментов пункты размазывают потоки, поэтому сравниваем с вторым, а не с суммой).
+    const [top, second] = flows
+      .filter((f) => f.from === unitId(key) && f.kind === 'transferred')
+      .toSorted((a, b) => b.functionCount - a.functionCount);
+    const target = top && [...afterKeys].find((k) => unitId(k) === top.to && !beforeKeys.has(k));
+    if (target && (!second || top.functionCount >= 1.5 * second.functionCount)) transformedInto.set(unitId(key), target);
+  }
+  const labelOfKey = (k: string) => {
+    const x = structure.after.find((y) => y.key === k);
+    return x ? (x.abbr ?? x.name) : k;
+  };
   const units: UnitChange[] = keys.map((key) => {
     const b = structure.before.find((u) => u.key === key);
     const a = structure.after.find((u) => u.key === key);
@@ -743,7 +761,8 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     };
     const parts: string[] = [];
     if (status === 'created') parts.push('Создано');
-    if (status === 'removed') parts.push(u.kind === 'position' ? 'Должность упразднена' : 'Упразднено');
+    const into = transformedInto.get(unitId(key));
+    if (status === 'removed') parts.push(into ? `Преобразовано в ${labelOfKey(into)}` : u.kind === 'position' ? 'Должность упразднена' : 'Упразднено');
     if (status === 'retained') parts.push('Сохранено без изменений');
     if (status === 'reorganized') parts.push('Сохранено с изменениями');
     if (receivedFrom.length) parts.push(`получило функции от: ${receivedFrom.map((f) => `${label(f.from)} (${f.functionCount})`).join(', ')}`);
@@ -792,14 +811,14 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
       kind === 'unit_created'
         ? `${pos ? 'Введена должность' : 'Создано подразделение'}: ${u.name}${u.abbr ? ` (${u.abbr})` : ''}`
         : kind === 'unit_removed'
-          ? `${pos ? 'Упразднена должность' : 'Упразднено подразделение'}: ${u.name}`
+          ? `${pos ? 'Упразднена должность' : 'Упразднено подразделение'}: ${u.name}${transformedInto.has(u.id) ? ` (функции переданы ${labelOfKey(transformedInto.get(u.id)!)})` : ''}`
           : `Признаки реорганизации: ${u.name}${u.abbr ? ` (${u.abbr})` : ''}`;
     const unitFlows = flows.filter((f) => f.kind === 'transferred' && (f.from === u.id || f.to === u.id));
     const flowEv = unitFlows.flatMap((f) => f.evidence).slice(0, 4);
     const pairsOfFlows = unitFlows.flatMap((f) => (flowPairs.get(flowKey(f)) ?? []).slice(0, 2)).slice(0, 6);
     raw.push({
       kind,
-      severity: kind === 'unit_removed' && lostByUnit.get(u.id) ? 'high' : 'medium',
+      severity: kind === 'unit_removed' && lostByUnit.get(u.id) && !transformedInto.has(u.id) ? 'high' : 'medium',
       title,
       detail: `${u.summary}.${u.positions.before.length || u.positions.after.length ? ` Должности до: ${u.positions.before.join(', ') || '—'}; после: ${u.positions.after.join(', ') || '—'}.` : ''}`,
       unitIds: [u.id],
