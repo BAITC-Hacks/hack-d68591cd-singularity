@@ -1,215 +1,140 @@
-<h1 align="center">Admin Dashboard Template with Next.js &amp; Shadcn UI</h1>
+# OrgDiff — ИИ-агент анализа оргструктуры и функционала
 
-<div align="center">Free, open source admin dashboard starter built with Next.js 16, shadcn/ui, Tailwind CSS, and TypeScript</div>
+## Описание решения и его назначение
 
-<div align="center">
-  <a href="https://dub.sh/shadcn-dashboard"><strong>View Demo</strong></a>
-</div>
+Трек 11, задача «ИИ-агент „Анализ организационной структуры и функционала“».
 
-<br />
+При реорганизации сотрудник вручную сверяет положения о подразделениях, оргструктуры и приложения к приказам «до» и «после». OrgDiff делает это автоматически. Пользователь загружает оба комплекта документов, а агент:
 
-<div align="center">
-  <img src="/public/shadcn-dashboard.png" alt="Shadcn Dashboard Cover" style="max-width: 100%; border-radius: 8px;" />
-</div>
+1. определяет, какие подразделения **созданы, сохранены, реорганизованы или упразднены**, и куда ушли функции упразднённых;
+2. сопоставляет функции «до» и «после» и находит **потерю и сужение функций**;
+3. находит **дублирование функций, пересечение зон ответственности и признаки конфликта интересов** (по каталогу правил IIA / разделения обязанностей);
+4. у **каждого вывода показывает источник**: документ, номер пункта и дословную цитату, автоматически проверенную по тексту;
+5. формирует **итоговое заключение с рекомендациями**.
 
-<br />
+Выводы носят рекомендательный характер: формулировки даны как гипотезы («признаки дублирования»), а вывод без подтверждённой цитаты не показывается (ограничение 9 ТЗ).
 
-<p align="center">
-  <a href="https://github.com/Kiranism/next-shadcn-dashboard-starter/stargazers"><img src="https://img.shields.io/github/stars/Kiranism/next-shadcn-dashboard-starter?style=social" alt="GitHub stars" /></a>
-  <a href="https://github.com/Kiranism/next-shadcn-dashboard-starter/network/members"><img src="https://img.shields.io/github/forks/Kiranism/next-shadcn-dashboard-starter?style=social" alt="Forks" /></a>
-  <a href="https://github.com/Kiranism/next-shadcn-dashboard-starter/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Kiranism/next-shadcn-dashboard-starter" alt="MIT License" /></a>
-  <img src="https://img.shields.io/badge/Next.js-16-black" alt="Next.js" />
-</p>
+## Архитектура
 
-## Overview
-
-A free, open source (MIT) admin dashboard starter built with Next.js 16, shadcn/ui on Base UI primitives, TypeScript, and Tailwind CSS v4.
-
-Every feature is a working, production-ready implementation, not static demo UI. Tables search, filter, sort, and paginate for real. Forms validate and mutate with cache invalidation.
-
-Clone it, strip what you don't need with the built-in cleanup script, and start building on patterns you'd write yourself. It works well as a base for SaaS apps, internal tools, and admin panels.
-
-### Why This Template
-
-Most dashboard templates are static demo boilerplates: screens that look finished but need rebuilding the moment you wire in real data. This starter takes the opposite approach:
-
-- **Everything actually works.** Data tables run end-to-end: server prefetch, client-side React Query cache, and URL-synced search, filtering, sorting, and pagination via nuqs. Forms are built from reusable, composable fields with Zod validation, including advanced patterns like multi-step and dialog/sheet forms, with real create/update mutations and cache invalidation on success.
-- **Industry-standard implementations.** The data layer follows the official TanStack Query SSR pattern (server prefetch + `HydrationBoundary` + `useSuspenseQuery`), typed end to end, organized in a feature-based structure with a clean API layer per feature. These are patterns you copy into production code as-is, not mockups you rebuild from scratch.
-- **Minimal by design.** Deliberately lean, with no bloated boilerplate, so you spend your time tweaking it to your use case, not deleting someone else's code. The built-in [cleanup script](#cleanup-script-start-minimal-in-60-seconds) strips any feature you don't need in under a minute.
-
-### Tech Stack
-
-- Framework - [Next.js 16](https://nextjs.org/16)
-- Language - [TypeScript](https://www.typescriptlang.org)
-- Styling - [Tailwind CSS v4](https://tailwindcss.com)
-- Components - [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com) primitives
-- Charts - [Recharts](https://recharts.org) • [Evil Charts](https://evilcharts.com/)
-- Schema validation - [Zod](https://zod.dev)
-- Data fetching - [TanStack React Query](https://tanstack.com/query)
-- Search param state - [Nuqs](https://nuqs.47ng.com/)
-- Tables - [TanStack Data Tables](https://ui.shadcn.com/docs/components/data-table) • [Dice Table](https://www.diceui.com/docs/components/data-table)
-- Forms - [TanStack Form](https://tanstack.com/form) + [Zod](https://zod.dev)
-- Command+K interface - [kbar](https://kbar.vercel.app/)
-- Linter / Formatter - [OxLint](https://oxc.rs/docs/guide/usage/linter) • [Oxfmt](https://oxc.rs/docs/guide/usage/formatter)
-- Pre-commit hooks - [Husky](https://typicode.github.io/husky/)
-- Themes - [tweakcn](https://tweakcn.com/)
-
-_Looking for a TanStack Start version? Here's the [repo](https://git.new/tanstack-start-dashboard)._
-
-## Features
-
-- Pre-built dashboard layout with sidebar, header, and content area
-- Analytics overview page with cards and charts
-- Data tables with React Query prefetch, client-side cache, search, filter, and pagination
-- Infobar component for tips, status messages, or contextual notes on any page
-- shadcn/ui components on Base UI primitives, styled with Tailwind CSS
-- Six-plus themes with a theme switcher
-- Feature-based folder structure
-- A starting point for SaaS dashboards, internal tools, and client admin panels
-
-## Use Cases
-
-A few things you can build with it:
-
-- SaaS admin dashboards
-- Internal tools and operations panels
-- Analytics dashboards
-- Client project admin panels
-- A boilerplate for new Next.js shadcn projects
-
-## Pages
-
-| Page                                                                                                                                                                  | Notes                                                                                                                                                                                |
-| :------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Dashboard Overview](https://shadcn-dashboard.kiranism.dev/dashboard)                                                                                                 | Cards and Recharts graphs. Parallel routes give each section its own loading and error state.                                                                                       |
-| [Product List (Table)](https://shadcn-dashboard.kiranism.dev/dashboard/product)                                                                                       | TanStack Table plus React Query (server prefetch, client cache) with nuqs URL state for search, filter, and pagination. `shallow: true` keeps interactions on the client.           |
-| [Create Product Form](https://shadcn-dashboard.kiranism.dev/dashboard/product/new)                                                                                    | TanStack Form and Zod with `useMutation` for create and update. Cache is invalidated on success.                                                                                    |
-| [Users (Table)](https://shadcn-dashboard.kiranism.dev/dashboard/users)                                                                                                | Same setup as Products: React Query with nuqs, server prefetch, and client-side pagination and filtering.                                                                           |
-| [Not Found](https://shadcn-dashboard.kiranism.dev/dashboard/notfound)                                                                                                 | A root-level not-found page.                                                                                                                                                        |
-
-## Folder Structure
-
-```plaintext
-src/
-├── app/                           # Next.js App Router directory
-│   ├── dashboard/                 # Dashboard route group
-│   │   ├── overview/              # Analytics with parallel routes
-│   │   ├── product/               # Product CRUD pages (React Query)
-│   │   ├── users/                 # Users table (React Query + nuqs)
-│   └── api/                       # API routes
-│
-├── components/                    # Shared components
-│   ├── ui/                        # UI primitives (buttons, inputs, dialogs, etc.)
-│   ├── layout/                    # Layout components (header, sidebar, etc.)
-│   ├── themes/                    # Theme system (selector, mode toggle, config)
-│   └── kbar/                      # Command+K interface
-│
-├── features/                      # Feature-based modules
-│   ├── overview/                  # Dashboard analytics (charts, cards)
-│   ├── products/                  # Product listing, form, tables (React Query)
-│   ├── users/                     # User management table (React Query)
-│
-├── lib/                           # Core utilities (query-client, searchparams, etc.)
-├── hooks/                         # Custom hooks
-├── config/                        # Navigation, infobar, data table config
-├── constants/                     # Mock data
-├── styles/                        # Global CSS & theme files
-│   └── themes/                    # Individual theme CSS files
-└── types/                         # TypeScript types
+```mermaid
+flowchart LR
+  U[Браузер: загрузка до/после] -->|POST /api/analyze| API[Next.js API]
+  API --> P1[1. Разбор docx/pdf/xlsx на пункты]
+  P1 --> P2[2. Состав подразделений и должностей<br/>правило; LLM-фолбэк]
+  P2 --> P3[3. Функции и их носители]
+  P3 --> P4[4. Выравнивание дословно совпавших пунктов]
+  P4 --> P5[5. Эмбеддинги → кандидаты]
+  P5 --> P6[6. LLM-сопоставление изменённых функций]
+  P6 --> P7[7. Самопроверка потерь по всему документу]
+  P7 --> P8[8. Дублирование и пересечения]
+  P8 --> P9[9. Конфликт интересов: каталог правил]
+  P9 --> P10[10. Проверка каждой цитаты по тексту пункта]
+  P10 --> P11[11. Итоговое заключение]
+  P11 -->|GET /api/analyze/:id| U
 ```
 
-## Getting Started
+Принцип: **детерминированный код везде, где можно, LLM только там, где нужен смысл.**
 
-> [!NOTE]
-> This starter uses Next.js 16 (App Router) with React 19 and shadcn/ui. To run it locally:
+- Пункты, состав подразделений и носители функций определяются правилами. Они воспроизводимы и не зависят от температуры модели.
+- Около 85% пунктов совпадают дословно и сопоставляются без LLM. Модель получает только изменённые (≈57 из 377) вместе с кандидатами, отобранными по эмбеддингам.
+- Каждую «потерю» агент перепроверяет вторым проходом по всему документу «после» (паттерн evaluator). Частичное покрытие общими нормами не снимает вывод, но попадает в пояснение.
+- Каждая цитата проверяется на вхождение в текст пункта. Вывод без подтверждённого источника отбрасывается.
+- Шаги агента видны в интерфейсе как лента прогресса (`trace`).
 
-Clone the repo:
+| Путь | Что там |
+|---|---|
+| `src/features/orgdiff/types.ts` | контракт между пайплайном и интерфейсом |
+| `src/features/orgdiff/lib/parse-clauses.ts` | сегментация на пункты: склеенные пункты, заголовки из оглавления |
+| `src/features/orgdiff/lib/units.ts` | подразделения, должности, подчинённость, носители функций |
+| `src/features/orgdiff/lib/analyze.ts` | оркестратор агента, сборка выводов и проверка цитат |
+| `src/features/orgdiff/lib/judge.ts` | промпты LLM со строгими JSON-схемами, каталог правил КИ |
+| `src/features/orgdiff/lib/llm.ts` | клиент OpenAI и дисковый кэш ответов |
+| `src/app/api/analyze/` | API: запуск анализа и статус задачи |
+| `src/features/orgdiff/components/`, `src/app/dashboard/orgdiff/` | интерфейс |
+| `scripts/eval.ts` | проверка качества по эталону и контрольному комплекту |
+| `data/` | тестовые документы, контрольный комплект, эталон, кэш ответов LLM |
 
+## Используемые технологии
+
+Next.js 16 (App Router), React 19, TypeScript, Bun, Tailwind 4, shadcn/ui, TanStack Query + Table, React Flow (`@xyflow/react`).
+ИИ: OpenAI Responses API, модель `gpt-6-astra` со structured outputs (строгие JSON-схемы); эмбеддинги `text-embedding-3-large`.
+Документы: `mammoth` (.docx), `unpdf` (.pdf), `read-excel-file` (.xlsx).
+
+## Системные требования и зависимости
+
+- Bun 1.4+ (или Node.js 20+)
+- Доступ в интернет к `api.openai.com` нужен только для **новых** документов. Тестовый комплект и контрольный набор отвечают из кэша `data/cache/` без сети.
+
+## Установка
+
+```sh
+git clone https://github.com/BAITC-Hacks/hack-d68591cd-singularity.git
+cd hack-d68591cd-singularity
+bun install
 ```
-git clone https://github.com/Kiranism/next-shadcn-dashboard-starter.git
+
+## Параметры окружения
+
+Настраивать ничего не нужно: тестовый ключ хакатона уже лежит в закоммиченном `.env`.
+
+| Переменная | Назначение | Обязательна | Значение по умолчанию |
+|---|---|---|---|
+| `OPENAI_API_KEY` | ключ OpenAI API | да (уже в `.env`) | тестовый ключ хакатона |
+| `OPENAI_MODEL` | модель анализа | нет | `gpt-6-astra` |
+| `OPENAI_EMBEDDING_MODEL` | модель эмбеддингов | нет | `text-embedding-3-large` |
+
+Чтобы подставить свой ключ, создайте `.env.local`: он имеет приоритет над `.env` (см. `env.example.txt`).
+
+## Запуск
+
+```sh
+bun run dev                        # режим разработки, http://localhost:3000
+bun run build && bun run start     # продакшен-сборка
 ```
 
-- `bun install`
-- Copy the example env file: `cp env.example.txt .env.local`
-- Fill in the required variables in `.env.local`
-- `bun run dev`
+Без интерфейса:
 
-##### Environment variables
-
-See `env.example.txt` for the variables you need. They cover authentication and error tracking.
-
-The app should now be running at http://localhost:3000.
-
-> [!WARNING]
-> After cloning or forking, be careful when pulling the latest changes. Updates can cause merge conflicts.
-
----
-
-## Cleanup Script: Start Minimal in 60 Seconds
-
-Most starters make you hand-delete demo pages and rip out dependencies. This one ships with a cleanup script that removes the optional features you don't need (folders, files, dependencies, docs, and env entries), leaving a minimal base to build on. Run `--list` to see what's removable:
-
-```bash
-bun run cleanup --interactive    # interactive mode
-bun run cleanup --list           # see available features
-bun run cleanup --dry-run chat   # preview before removing
-bun run cleanup kanban chat      # remove specific features
+```sh
+bun run analyze:demo    # анализ тестового комплекта, сводка в консоль
+bun run eval            # проверка качества по эталону и контрольному комплекту
 ```
 
-Run `bun run cleanup --help` for all options (with npm, pass flags after `--`: `npm run cleanup -- --list`). The replacement files it writes live in `scripts/cleanup-templates/` as real, typechecked code. When you're done, delete `scripts/cleanup.js`, `scripts/cleanup-templates/`, and the `cleanup` entry in `package.json`.
+## Порядок проверки основного сценария
 
-## FAQ
+1. `bun run dev` → открыть `http://localhost:3000/dashboard/orgdiff`.
+2. Загрузить комплект «до» (`data/before_polozhenie_red8.docx`) и «после» (`data/after_polozhenie_red9.docx`) или нажать «Тестовый комплект».
+3. **Ожидаемый результат** (из кэша — за секунды, на новых документах ~2–3 минуты):
+   - создано: ДИТААД, ДОА; упразднена должность «Директор направления внутреннего аудита», её функции переданы ДИТААД и ДОА; ДНМ и ДККМ реорганизованы;
+   - потери функций: ДККМ — п. 5.6.2 (группы контроля качества), п. 5.6.3 (предложения по внешней оценке), ДНМ — п. 5.7.2;
+   - пересечение: анализ результатов непрерывного аудита (пп. 5.3.8 и 5.4.5 новой редакции);
+   - конфликт интересов: участие Главного аудитора в органах управления подконтрольных обществ (п. 4.4);
+   - у каждого вывода — документ, пункт и цитата; итоговое заключение с рекомендациями.
+4. Контрольный комплект с заранее известными изменениями: загрузить «после» = `data/control/after_red9_control.txt`. В нём удалена функция, одна функция продублирована в ДНМ, а ДККМ переименован в ДМК.
 
-**Is it production ready?**
-Yes. Every feature is a complete, working implementation: authentication, CRUD flows, table search/filter/sort/pagination, and form validation with mutations all function end-to-end. It's a starting point for real applications, not a visual mockup.
+Через API:
 
-**How is this different from other dashboard templates?**
-Most dashboard templates are static demo boilerplates: screens that look finished but need rebuilding once you wire in real data. Here the tables, forms, auth, organizations, and billing all work end-to-end, the implementations follow official TanStack and Next.js patterns, and a cleanup script keeps the base minimal so you tweak it to your use case instead of deleting code.
+```sh
+curl -X POST 'http://localhost:3000/api/analyze?demo=1'          # → {"jobId":"…"}
+curl http://localhost:3000/api/analyze/<jobId>                    # статус, шаги агента, результат
+curl -X POST http://localhost:3000/api/analyze -F before=@data/before_polozhenie_red8.docx -F after=@data/after_polozhenie_red9.docx
+```
 
-**Is it free for commercial use?**
-Yes. MIT-licensed and free for both personal and commercial projects: no paid tier, no license keys.
+### Качество
 
-**How do I remove demo pages or features I don't need?**
-Run `bun run cleanup --interactive` and pick what to strip, or `bun run cleanup --list` to see what can be removed.
+`bun run eval` сверяет результат с экспертным эталоном `data/control/GOLD.md`: 57 размеченных изменений, цитаты проверены по тексту. Затем прогоняет контрольный комплект. Текущий результат: **15/16 проверок**, 100% цитат найдены в текстах пунктов.
 
-**Does it support Next.js 16, React 19, and Tailwind CSS v4?**
-Yes. The template is built on Next.js 16 (App Router), React 19, and Tailwind CSS v4, with shadcn/ui on Base UI primitives, and is actively maintained to track new releases.
+## Раскрытие использованных материалов
 
-**Can I use npm instead of Bun?**
-Yes. Bun is preferred, but npm works too, and the repo even ships both Node.js and Bun Dockerfiles for deployment.
+**Стартовый шаблон.** Проект стартовал с открытого boilerplate [Kiranism/next-shadcn-dashboard-starter](https://github.com/Kiranism/next-shadcn-dashboard-starter) (MIT): каркас админ-дашборда (layout, sidebar, таблицы, темы, UI-компоненты). До начала соревновательной части из него удалили авторизацию и демо-страницы. Предметной функциональности шаблон не содержал.
 
-**Does it work with AI coding assistants?**
-Yes. The repo ships AGENTS.md and CLAUDE.md with the project's conventions, plus a bundled Claude Code skill (`.claude/skills/kiranism-shadcn-dashboard`) that teaches agents how to add pages, tables, forms, and navigation the template way. Works with Claude Code, Cursor, and any tool that reads AGENTS.md.
+**Разработано в ходе соревновательной части:** весь пайплайн анализа (`src/features/orgdiff/lib`), API, интерфейс анализа, эталон и контрольный комплект, скрипт оценки.
 
-**What data fetching pattern does it use?**
-TanStack React Query with the official SSR pattern: `prefetchQuery` on the server, `HydrationBoundary` with `dehydrate` for hydration, and `useSuspenseQuery` on the client, plus nuqs for URL-synced search-param state. Mutations invalidate the cache on success.
+**Модели и данные.** OpenAI `gpt-6-astra` и `text-embedding-3-large` через API. Тестовые документы предоставлены организатором.
 
-**How do I deploy it?**
-Deploy to Vercel out of the box, or use the included Docker setups: a Node.js Dockerfile and a Bun Dockerfile, both using Next.js standalone output mode. See the [deployment guide](./docs/deployment.md).
+**AI-инструменты.** Использовались при разработке (п. 5.4.12 разрешает любые AI-инструменты и агенты).
 
-## Deploy
+**Библиотеки:** см. `package.json`.
 
-Deploy to Vercel out of the box, or use the included Docker setups: a Node.js Dockerfile and a Bun Dockerfile, both using Next.js standalone output mode. Full guide: [docs/deployment.md](./docs/deployment.md).
+## Лицензия
 
-### Support
-
-If this template saved you some time, a star is appreciated. You can also [buy me a coffee](https://buymeacoffee.com/kir4n) if you'd like.
-
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?style=flat-square&logo=buymeacoffee)](https://buymeacoffee.com/kir4n)
-
-<!--
-
-SEO keywords:
-
-open source admin dashboard, nextjs admin dashboard, nextjs dashboard template,
-
-shadcn ui dashboard, admin dashboard starter, next.js 16, typescript dashboard,
-
-dashboard ui template, nextjs shadcn admin panel, react admin dashboard,
-
-tailwind css admin dashboard, production ready admin dashboard template,
-
-free react admin dashboard, nextjs 16 dashboard starter, working crud dashboard
-
--->
-
+MIT
