@@ -43,7 +43,7 @@ export function OrgdiffView() {
         />
       ) : null}
       <Tabs value={tab} onValueChange={(value) => void setParams({ tab: value as OrgdiffTab })}>
-        <TabsList>
+        <TabsList className='h-auto max-w-full flex-wrap justify-start'>
           <TabsTrigger value='upload'>Загрузка</TabsTrigger>
           {RESULT_TABS.map(({ id, label }) => (
             <TabsTrigger key={id} value={id} disabled={!result}>

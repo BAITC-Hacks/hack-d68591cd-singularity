@@ -52,7 +52,12 @@ export function UploadPanel({ onShowResults }: UploadPanelProps) {
           </p>
         </div>
         <div className='flex flex-wrap gap-2'>
-          <Button variant='outline' disabled={isBusy} onClick={() => sample.mutate()}>
+          <Button
+            variant='outline'
+            className='h-auto min-h-8 max-w-full whitespace-normal text-left'
+            disabled={isBusy}
+            onClick={() => sample.mutate()}
+          >
             {sample.isPending ? <Icons.spinner className='animate-spin' /> : <Icons.sparkles />}
             Загрузить тестовый комплект (ред. 8 → ред. 9)
           </Button>
