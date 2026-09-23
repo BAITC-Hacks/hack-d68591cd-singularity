@@ -86,10 +86,14 @@ check(
   !!control.findings.find((f) => ['function_duplicated', 'responsibility_overlap'].includes(f.kind) && cites(f, 'after', '5.4.11'))
 );
 check(
-  'C3 реорганизация: ДККМ → ДМК',
-  unit(control, 'ДККМ')?.status === 'removed' &&
-    unit(control, 'ДМК')?.status === 'created' &&
-    !!control.findings.find((f) => f.kind === 'unit_reorganized' && f.unitIds.includes(unit(control, 'ДККМ')!.id))
+  'C3 реорганизация: ДККМ → ДМК (переименование/преобразование)',
+  // Переименование — одно подразделение со статусом «реорганизовано» и выводом «Переименование: ДККМ → ДМК»;
+  // допускается и пара «упразднено + создано» с выводом о преобразовании.
+  (unit(control, 'ДМК')?.status === 'reorganized' &&
+    !!control.findings.find((f) => f.kind === 'unit_reorganized' && /ДККМ/u.test(f.title) && /ДМК/u.test(f.title))) ||
+    (unit(control, 'ДККМ')?.status === 'removed' &&
+      unit(control, 'ДМК')?.status === 'created' &&
+      !!control.findings.find((f) => f.kind === 'unit_reorganized' && f.unitIds.includes(unit(control, 'ДККМ')!.id)))
 );
 check('Все цитаты найдены в текстах пунктов', citationRate(control) === 1, `${(citationRate(control) * 100).toFixed(0)}%`);
 

@@ -225,8 +225,14 @@ const SUBJECT_HEAD =
 
 export function docHead(text: string): DocHead {
   const lines = text.slice(0, 2000).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const i = lines.findIndex((l) => /^(?:ПОЛОЖЕНИЕ|ДОЛЖНОСТНАЯ\s+ИНСТРУКЦИЯ|ПРИКАЗ|РАСПОРЯЖЕНИЕ)(?![\p{L}])/u.test(l));
-  if (i < 0) return {};
+  let i = lines.findIndex((l) => /^(?:ПОЛОЖЕНИЕ|ДОЛЖНОСТНАЯ\s+ИНСТРУКЦИЯ|ПРИКАЗ|РАСПОРЯЖЕНИЕ)(?![\p{L}])/u.test(l));
+  if (i < 0) {
+    // PDF часто склеивает шапку в одну строку: «УТВЕРЖДЕНО … ПОЛОЖЕНИЕ О ДЕПАРТАМЕНТЕ … 1. Общие положения …».
+    const KIND = /(?:ПОЛОЖЕНИЕ|ДОЛЖНОСТНАЯ\s+ИНСТРУКЦИЯ|ПРИКАЗ|РАСПОРЯЖЕНИЕ)(?![\p{L}])/u;
+    i = lines.findIndex((l) => KIND.test(l));
+    if (i < 0) return {};
+    lines[i] = lines[i].slice(lines[i].search(KIND)).replace(/\s+(?:\d{1,2}\.\s|[IVX]{1,4}\.\s|от\s|УТВЕРЖД).*$/u, '');
+  }
   if (/^(?:ПРИКАЗ|РАСПОРЯЖЕНИЕ)/u.test(lines[i])) return { kind: 'order' };
   // «ПОЛОЖЕНИЕ» и «О ДЕПАРТАМЕНТЕ …» часто стоят на разных строках; редакция, дата и первый пункт — уже не название.
   let head = lines[i];

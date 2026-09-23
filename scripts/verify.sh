@@ -1,8 +1,6 @@
 #!/bin/sh
-# П. 5.4.16: если проект не запускается по инструкциям из репозитория — команда не допускается
-# к отбору, исправления не принимаются. Этот скрипт проверяет запуск ИЗ ЧИСТОГО КЛОНА,
-# а не из твоей рабочей папки, где всё уже стоит и переменные давно в окружении.
-# Запусти минимум за час до 18:00. Использование: bun run verify
+# Проверка запуска из чистого клона (п. 5.4.16): install → build → start → страница → демо-анализ → заключение → eval без ключа.
+# Использование: bun run verify
 set -e
 # Основной сценарий проверяется без ключа: тестовый комплект отвечает из закоммиченного кэша.
 PORT=${PORT:-3999}
@@ -46,7 +44,9 @@ while [ $n -lt 60 ]; do
 done
 grep -q '"findings":\[{' "$TMP/job.json" || { echo "❌ демо-анализ не дал выводов"; exit 1; }
 echo "✅ демо-анализ: готово за ${n}с"
-[ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/api/analyze/$JOB/report")" = 200 ] && echo "✅ заключение .docx выгружается"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/api/analyze/$JOB/report")" = 200 ] || { echo "❌ заключение не выгружается"; exit 1; }
+echo "✅ заключение .docx выгружается"
 
 echo "-> bun run eval без ключа (эталон + контрольный комплект из кэша)"
-OPENAI_API_KEY= bun run eval | tail -3
+OPENAI_API_KEY= bun run eval > "$TMP/eval.log" 2>&1 || { tail -20 "$TMP/eval.log"; echo "❌ eval не прошёл"; exit 1; }
+tail -3 "$TMP/eval.log"

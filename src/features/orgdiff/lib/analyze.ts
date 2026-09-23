@@ -178,6 +178,10 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     (r) => `до: ${r.before.map((u) => u.abbr ?? u.name).join(', ')}; после: ${r.after.map((u) => u.abbr ?? u.name).join(', ')}`
   );
 
+  // «Отделы по основным направлениям», «структурные подразделения» — родовые названия, а не подразделения.
+  const GENERIC_UNIT = /^(?:отделы|подразделения|структурные\s+подразделения|управления|службы|секторы|сектора|группы|департаменты)(?!\p{L})|по\s+основным\s+направлениям/iu;
+  for (const side of ['before', 'after'] as const) structure[side] = structure[side].filter((u) => !GENERIC_UNIT.test(u.name));
+
   // 3. Функции с носителями. В комплекте из нескольких документов «Положение о Департаменте …» и
   // «Должностная инструкция …» дают носителя по умолчанию, а пункты приказа — поручения, не функции.
   const docCtx = (side: DocSide) => {
@@ -226,6 +230,24 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     },
     (r) => `совпали дословно: ${r.size} из ${fns.before.length}; к сопоставлению ИИ: ${fns.before.length - r.size}`
   );
+
+  // Переименование/преобразование: X есть только «до», Y — только «после», и большая часть функций X дословно у Y.
+  // Это одно подразделение под новым названием, а не пара «упразднено + создано».
+  const renamed = new Map<string, string>();
+  for (const x of structure.before.filter((u) => !structure.after.some((a) => a.key === u.key))) {
+    const xs = fns.before.filter((f) => f.holders.includes(x));
+    if (xs.length < 3) continue;
+    let best: UnitDef | undefined;
+    let bestN = 0;
+    for (const y of structure.after.filter((u) => !structure.before.some((b) => b.key === u.key) && !renamed.has(u.key))) {
+      const n = xs.filter((f) => exact.get(f.uid)?.some((a) => a.holders.includes(y))).length;
+      if (n > bestN) [best, bestN] = [y, n];
+    }
+    if (best && bestN >= 0.6 * xs.length) {
+      renamed.set(best.key, `${x.name}${x.abbr ? ` (${x.abbr})` : ''}`);
+      x.key = best.key;
+    }
+  }
 
   // 5. Векторы для отбора кандидатов
   const afterAll = buildAllClauseFns(parsed.after, fns.after);
@@ -482,7 +504,8 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
           const s = suggestions.get(f.ref);
           return s ? [s, ...recipients(f).filter((r) => r.unit.key !== s.unit.key)] : recipients(f);
         },
-        reasons: (f) => suggestions.get(f.ref)?.reason
+        reasons: (f) => suggestions.get(f.ref)?.reason,
+        renamed
       }),
     (r) => `выводов: ${r.findings.length}; отброшено без подтверждённой цитаты: выводов ${r.dropped}, цитат ${r.unverified}`
   );
@@ -498,7 +521,13 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
             `${f.id} [${f.origin === 'preexisting' ? 'было ранее' : 'новое'}; ${f.kind}, ${f.severity}] ${f.title}. ${clip(f.detail, 700)}${f.recommendation ? ` Рекомендация вывода: ${clip(f.recommendation, 300)}` : ''} Источники: ${f.evidence.map((e) => `${e.side === 'before' ? 'до' : 'после'}${docTag(e.side, e.docName)} п. ${e.clauseId}`).join(', ')}`
         )
         .join('\n');
-      const d = await writeConclusion(digest);
+      const d = assembled.findings.length
+        ? await writeConclusion(digest)
+        : {
+            summary: `Изменений не выявлено: состав подразделений совпадает, ${exact.size} из ${fns.before.length} функций совпадают дословно, остальные сопоставлены по смыслу без потерь, дублирования и конфликтов интересов.`,
+            sections: [],
+            recommendations: []
+          };
       const ids = new Set(assembled.findings.map((f) => f.id));
       return {
         summary: d.summary,
@@ -516,7 +545,15 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     compliance = await step(
       'compliance',
       'Сверка с внешними требованиями (IIA + законодательство по юрисдикции документов)',
-      () => checkCompliance(parsed.after, jurisdiction.applicable),
+      async () => {
+        // Каталог требований — о функции внутреннего аудита; к документам о другой деятельности не применяется.
+        const topic = [...meta.values()].map((m) => m.title ?? '').join(' ') + ' ' + parsed.after.slice(0, 60).map((c) => c.text).join(' ');
+        if (!/внутренн\p{L}*\s+аудит|аудиторск/iu.test(topic)) {
+          jurisdiction.note = 'Сверка не проводилась: каталог требований относится к функции внутреннего аудита, а документы — о другой деятельности.';
+          return [];
+        }
+        return checkCompliance(parsed.after, jurisdiction.applicable);
+      },
       (r) => {
         const n = (st: ComplianceItem['status']) => r.filter((x) => x.status === st).length;
         return `юрисдикция: ${jurisdiction.applicable.join(' + ')}; требований: ${r.length}; выполнено ${n('met')}, частично ${n('partial')}, не выполнено ${n('not_met')}, противоречит ${n('contradicts')}, не найдено ${n('no_evidence')}`;
@@ -660,6 +697,7 @@ interface AssembleInput {
   humanize: (text: string) => string;
   recipients: (f: Fn) => Recipient[];
   reasons: (f: Fn) => string | undefined;
+  renamed: Map<string, string>;
 }
 
 interface Recipient {
@@ -675,7 +713,7 @@ const RECIPIENT_MIN_SCORE = 0.45;
 const GENERIC_DUTY =
   /по всему кругу вопросов|прочих поручений|профессионального уровня|запрашива\p{L}* у Руководителей Общества информаци|в разработке ВНД|в разработке проектов документации/iu;
 
-function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef, humanize, recipients, reasons }: AssembleInput) {
+function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef, humanize, recipients, reasons, renamed }: AssembleInput) {
   // Какие формулировки у каких носителей были в прежней редакции — для «новое / было ранее» и честных передач.
   const beforeText = new Map<string, Set<string>>();
   for (const f of fns.before) {
@@ -688,6 +726,32 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
   const hadBefore = (a: Fn, holderKey: string) => beforeText.get(norm(a.clause.text))?.has(holderKey) ?? false;
   const existedBefore = (a: Fn) => a.holders.length ? a.holders.every((h) => hadBefore(a, h.key)) : beforeText.has(norm(a.clause.text));
   const clauseExistedBefore = (c: ParsedClause) => parsed.before.some((b) => norm(b.text) === norm(c.text));
+
+  // Переименование по итоговому сопоставлению (в т.ч. через ИИ): большинство функций упразднённого X перешли
+  // к одному новому Y — заметно больше, чем к любому другому. Тогда это одно подразделение под новым названием.
+  const isNewKey = (k: string) => !structure.before.some((b) => b.key === k);
+  for (const x of structure.before.filter((u) => !structure.after.some((a) => a.key === u.key))) {
+    const rows = matchRows.filter((m) => m.fn?.holders.includes(x));
+    if (rows.length < 3) continue;
+    const counts = new Map<UnitDef, number>();
+    for (const m of rows) {
+      if (!['kept', 'moved', 'narrowed', 'expanded'].includes(m.status)) continue;
+      for (const y of new Set(m.after.flatMap((f) => f.holders))) {
+        if (isNewKey(y.key) && !renamed.has(y.key)) counts.set(y, (counts.get(y) ?? 0) + 1);
+      }
+    }
+    const [first, second] = [...counts.entries()].sort((p1, p2) => p2[1] - p1[1]);
+    if (!first || first[1] < 0.5 * rows.length || (second && first[1] < 1.5 * second[1])) continue;
+    const y = first[0];
+    renamed.set(y.key, `${x.name}${x.abbr ? ` (${x.abbr})` : ''}`);
+    x.key = y.key;
+    for (const m of rows) {
+      if (m.status === 'moved' && m.after.some((f) => f.holders.includes(y))) {
+        m.status = 'kept';
+        m.explanation = `Подразделение переименовано: «${x.name}» → «${y.name}». ${m.explanation}`;
+      }
+    }
+  }
   for (const m of matchRows) m.explanation = humanize(m.explanation);
   const clauseOf = (side: DocSide, docName: string, id: string) =>
     parsed[side].find((c) => c.docName === docName && c.id === id);
@@ -821,7 +885,8 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     const pa = new Set(posA.map((p) => normPosition(p, u)));
     const posChanged = pb.size !== pa.size || [...pb].some((p) => !pa.has(p));
     // «Реорганизовано» — только изменение состава/штата; изменение одних функций — «сохранено, изменён функционал».
-    const status = !b ? 'created' : !a ? 'removed' : posChanged ? 'reorganized' : 'retained';
+    const formerName = renamed.get(key);
+    const status = !b ? 'created' : !a ? 'removed' : posChanged || formerName ? 'reorganized' : 'retained';
 
     const receivedFrom = flows.filter((f) => f.to === unitId(key) && f.kind === 'transferred');
     const gaveTo = flows.filter((f) => f.from === unitId(key) && f.kind === 'transferred');
@@ -834,7 +899,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     const into = transformedInto.get(unitId(key));
     if (status === 'removed') parts.push(into ? `Преобразовано в ${labelOfKey(into)}` : u.kind === 'position' ? 'Должность упразднена' : 'Упразднено');
     if (status === 'retained') parts.push(t.in || t.out || t.lost || t.narrowed ? 'Сохранено, изменён функционал' : 'Сохранено без изменений');
-    if (status === 'reorganized') parts.push('Сохранено с изменениями');
+    if (status === 'reorganized') parts.push(formerName ? `Переименовано: прежнее наименование «${formerName}»` : 'Сохранено с изменениями');
     if (receivedFrom.length) parts.push(`получило функции от: ${receivedFrom.map((f) => `${label(f.from)} (${f.functionCount})`).join(', ')}`);
     if (gaveTo.length) parts.push(`передало функции: ${gaveTo.map((f) => `${label(f.to)} (${f.functionCount})`).join(', ')}`);
     if (posChanged && b && a) parts.push('изменён состав должностей');
@@ -872,6 +937,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
 
   // --- выводы
   const lostByUnit = new Map(keys.map((k) => [unitId(k), touched.get(k)?.lost ?? 0]));
+  const keyById = new Map(keys.map((k) => [unitId(k), k]));
   const raw: Omit<Finding, 'id'>[] = [];
   for (const u of units) {
     if (u.status === 'retained') continue;
@@ -882,7 +948,9 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
         ? `${pos ? 'Введена должность' : 'Создано подразделение'}: ${u.name}${u.abbr ? ` (${u.abbr})` : ''}`
         : kind === 'unit_removed'
           ? `${pos ? 'Упразднена должность' : 'Упразднено подразделение'}: ${u.name}${transformedInto.has(u.id) ? ` (функции переданы ${labelOfKey(transformedInto.get(u.id)!)})` : ''}`
-          : `Признаки реорганизации: ${u.name}${u.abbr ? ` (${u.abbr})` : ''}`;
+          : renamed.has(keyById.get(u.id) ?? '')
+            ? `Переименование: ${renamed.get(keyById.get(u.id) ?? '')} → ${u.name}${u.abbr ? ` (${u.abbr})` : ''}`
+            : `Признаки реорганизации: ${u.name}${u.abbr ? ` (${u.abbr})` : ''}`;
     const unitFlows = flows.filter((f) => f.kind === 'transferred' && (f.from === u.id || f.to === u.id));
     const flowEv = unitFlows.flatMap((f) => f.evidence).slice(0, 4);
     const pairsOfFlows = unitFlows.flatMap((f) => (flowPairs.get(flowKey(f)) ?? []).slice(0, 2)).slice(0, 6);
