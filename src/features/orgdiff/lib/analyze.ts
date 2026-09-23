@@ -27,6 +27,7 @@ import {
 } from './judge';
 import { embed, llmStats, MODEL } from './llm';
 import { checkCompliance } from './compliance';
+import { detectJurisdiction } from './jurisdiction';
 import { findRefDefects } from './defects';
 import { extractTables, extractText, isTableFile } from './load-doc';
 import { parseClauses, parseTable, toPublicClause, type ParsedClause } from './parse-clauses';
@@ -63,7 +64,7 @@ export const PIPELINE_STEPS = [
   { id: 'redistribute', label: 'Рекомендации по перераспределению утраченных функций' },
   { id: 'assemble', label: 'Проверка цитат и сборка выводов' },
   { id: 'conclusion', label: 'Итоговое аналитическое заключение' },
-  { id: 'compliance', label: 'Сверка с внешними требованиями (IIA, Закон РК «Об АО»)' }
+  { id: 'compliance', label: 'Сверка с внешними требованиями (IIA + законодательство по юрисдикции документов)' }
 ] as const;
 
 export const pendingTrace = (): TraceStep[] =>
@@ -510,14 +511,15 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
 
   // 13. Опция 1 ТЗ: сверка новой редакции с внешними требованиями. Ошибка шага не валит анализ.
   let compliance: ComplianceItem[] = [];
+  const jurisdiction = detectJurisdiction([...parsed.before, ...parsed.after]);
   try {
     compliance = await step(
       'compliance',
-      'Сверка с внешними требованиями (IIA, Закон РК «Об АО»)',
-      () => checkCompliance(parsed.after),
+      'Сверка с внешними требованиями (IIA + законодательство по юрисдикции документов)',
+      () => checkCompliance(parsed.after, jurisdiction.applicable),
       (r) => {
         const n = (st: ComplianceItem['status']) => r.filter((x) => x.status === st).length;
-        return `требований: ${r.length}; выполнено ${n('met')}, частично ${n('partial')}, не выполнено ${n('not_met')}, противоречит ${n('contradicts')}, не найдено ${n('no_evidence')}`;
+        return `юрисдикция: ${jurisdiction.applicable.join(' + ')}; требований: ${r.length}; выполнено ${n('met')}, частично ${n('partial')}, не выполнено ${n('not_met')}, противоречит ${n('contradicts')}, не найдено ${n('no_evidence')}`;
       }
     );
   } catch {
@@ -540,6 +542,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     findings: assembled.findings,
     conclusion,
     compliance,
+    jurisdiction,
     trace,
     stats: {
       clausesBefore: parsed.before.length,

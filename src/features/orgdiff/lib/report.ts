@@ -93,7 +93,12 @@ const findingMeta = (f: Finding) =>
 
 const COMPLIANCE_TITLE = '7. Сверка с внешними требованиями';
 const COMPLIANCE_DISCLAIMER =
-  'Сверка — ориентир для проверки, не юридическое заключение. Статус «Не найдено в комплекте» не означает нарушения: требование может закрываться уставом или другим документом вне комплекта. Требования РК применимы к акционерным обществам — резидентам РК, РФ — к публичным АО РФ, стандарты IIA — профессиональный ориентир.';
+  'Сверка — ориентир для проверки, не юридическое заключение. Статус «Не найдено в комплекте» не означает нарушения: требование может закрываться уставом или другим документом вне комплекта. Стандарты IIA — профессиональный ориентир; национальные требования — только той страны, на законодательство которой ссылаются сами документы.';
+
+const jurisdictionLine = (r: AnalysisResult) =>
+  r.jurisdiction
+    ? `Применимая юрисдикция: ${r.jurisdiction.note}${r.jurisdiction.evidence.length ? ` Основание: ${r.jurisdiction.evidence.map((e) => sourceLine(r, e)).join('; ')}.` : ''}`
+    : '';
 
 const complianceSummary = (items: ComplianceItem[]) =>
   (Object.keys(COMPLIANCE_STATUS_LABELS) as ComplianceItem['status'][])
@@ -164,7 +169,9 @@ export function reportMarkdown(r: AnalysisResult, reviews: Reviews = {}): string
 
   const comp = r.compliance ?? [];
   if (comp.length) {
-    out.push(`## ${COMPLIANCE_TITLE}`, '', `> ${COMPLIANCE_DISCLAIMER}`, '', `Новая редакция, требований: ${comp.length} (${complianceSummary(comp)}).`, '');
+    out.push(`## ${COMPLIANCE_TITLE}`, '', `> ${COMPLIANCE_DISCLAIMER}`, '');
+    if (jurisdictionLine(r)) out.push(jurisdictionLine(r), '');
+    out.push(`Новая редакция, требований: ${comp.length} (${complianceSummary(comp)}).`, '');
     out.push('| Требование | Источник | Статус | Пункты новой редакции и пояснение |', '|---|---|---|---|');
     for (const c of comp) {
       const refs = complianceRefs(r, c).map(mdCell).join('<br>');
@@ -271,6 +278,7 @@ export async function reportDocx(r: AnalysisResult, reviews: Reviews = {}): Prom
     children.push(
       h(COMPLIANCE_TITLE, HeadingLevel.HEADING_1),
       p(COMPLIANCE_DISCLAIMER, { italic: true }),
+      ...(jurisdictionLine(r) ? [p(jurisdictionLine(r))] : []),
       p(`Новая редакция, требований: ${comp.length} (${complianceSummary(comp)}).`),
       new Table({
         width: { size: 100, type: WidthType.PERCENTAGE },

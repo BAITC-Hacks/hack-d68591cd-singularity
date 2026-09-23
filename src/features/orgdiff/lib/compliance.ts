@@ -77,9 +77,10 @@ const humanRefs = (note: string, refs: Map<string, ParsedClause>) =>
     refs.has(ref) ? `п. ${refs.get(ref)!.id}` : m
   );
 
-export async function checkCompliance(after: ParsedClause[]): Promise<ComplianceItem[]> {
+export async function checkCompliance(after: ParsedClause[], applicable: Jurisdiction[]): Promise<ComplianceItem[]> {
   const clauses = complianceClauses(after);
   if (!clauses.length) return [];
+  const requirements = REQUIREMENTS.filter((r) => applicable.includes(r.jurisdiction));
   const refs = new Map(clauses.map((c, i) => [`K${i + 1}`, c]));
   const listing = [...refs.entries()]
     .map(
@@ -87,7 +88,7 @@ export async function checkCompliance(after: ParsedClause[]): Promise<Compliance
         `[${ref}] ${c.docName}, разд. «${c.sectionTitle}», п. ${c.id}: «${clip(c.text, CLAUSE_CHARS)}»`
     )
     .join('\n');
-  const reqs = REQUIREMENTS.map(
+  const reqs = requirements.map(
     (r) => `- ${r.id} [${r.jurisdiction}; ${r.source_ref}]: ${r.text}`
   ).join('\n');
 
@@ -100,7 +101,7 @@ export async function checkCompliance(after: ParsedClause[]): Promise<Compliance
 - contradicts — положение документа прямо противоречит требованию;
 - no_evidence — в переданных пунктах нет положений по теме. Это НЕ нарушение: требование может закрываться уставом или другим документом вне комплекта.
 
-Правила: для met, partial, not_met и contradicts обязательно дай ссылки на пункты и ДОСЛОВНЫЕ цитаты из них (короткий фрагмент, 5–25 слов). Не додумывай: если текст не позволяет судить — no_evidence. Требования KZ применимы, если общество — АО-резидент РК; RU — если публичное АО РФ; IIA — профессиональный ориентир. В note — 1–2 предложения по существу, без категоричных юридических выводов («признаки несоответствия», «требует проверки»).
+Правила: для met, partial, not_met и contradicts обязательно дай ссылки на пункты и ДОСЛОВНЫЕ цитаты из них (короткий фрагмент, 5–25 слов). Не додумывай: если текст не позволяет судить — no_evidence. Применимое законодательство уже определено по ссылкам в самих документах — в списке только применимые требования; IIA — профессиональный ориентир. В note — 1–2 предложения по существу, без категоричных юридических выводов («признаки несоответствия», «требует проверки»).
 
 Требования:
 ${reqs}
@@ -113,7 +114,7 @@ ${listing}`;
   });
   const byId = new Map(r.items.map((v) => [v.requirementId, v]));
 
-  return REQUIREMENTS.map((req): ComplianceItem => {
+  return requirements.map((req): ComplianceItem => {
     const v = byId.get(req.id);
     const base = {
       requirementId: req.id,

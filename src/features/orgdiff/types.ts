@@ -216,6 +216,15 @@ export const COMPLIANCE_STATUS_LABELS: Record<ComplianceStatus, string> = {
 };
 
 /** Сверка новой редакции с одним внешним требованием (законодательство, стандарты). */
+export interface JurisdictionInfo {
+  /** Всегда включает IIA; страны — только по документам (или РК по умолчанию) */
+  applicable: Jurisdiction[];
+  basis: 'documents' | 'default';
+  note: string;
+  /** Пункты, где документ ссылается на законодательство */
+  evidence: Evidence[];
+}
+
 export interface ComplianceItem {
   /** id из data/requirements.json: "KZ-AO-61-3" */
   requirementId: string;
@@ -258,6 +267,8 @@ export interface AnalysisResult {
   conclusion: Conclusion;
   /** Сверка новой редакции с внешними требованиями (IIA, законы об АО); ориентир, не юридическое заключение */
   compliance?: ComplianceItem[];
+  /** Применимая юрисдикция сверки — по ссылкам в самих документах */
+  jurisdiction?: JurisdictionInfo;
   trace: TraceStep[];
   stats: {
     clausesBefore: number;
