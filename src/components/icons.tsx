@@ -68,6 +68,7 @@ import {
   IconSelector,
   IconSend,
   IconSettings,
+  IconSitemap,
   IconShare,
   IconSlash,
   IconSparkles,
@@ -126,6 +127,7 @@ export const Icons = {
   // Layout
   dashboard: IconLayoutDashboard,
   kanban: IconLayoutKanban,
+  sitemap: IconSitemap,
   panelLeft: IconLayoutSidebar,
 
   // User
