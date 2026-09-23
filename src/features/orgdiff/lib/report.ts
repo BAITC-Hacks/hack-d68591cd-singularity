@@ -42,15 +42,27 @@ const KIND_ORDER: FindingKind[] = [
 const docLabel = (r: AnalysisResult, side: 'before' | 'after') =>
   r.documents
     .filter((d) => d.side === side)
-    .map((d) => d.title ?? d.name)
+    .map((d) => (d.title ? `${d.title} (файл ${d.name})` : d.name))
     .join('; ');
+
+/** Реквизиты сторон совпадают — предупреждаем, что стороны определены по порядку загрузки. */
+const sameRequisites = (r: AnalysisResult) => {
+  const t = (side: 'before' | 'after') =>
+    r.documents
+      .filter((d) => d.side === side)
+      .map((d) => (d.title ?? '').replace(/ \((до|после)\)$/, ''))
+      .join('|');
+  return t('before') !== '' && t('before') === t('after');
+};
+const SAME_REQUISITES_NOTE = 'Реквизиты документов «до» и «после» совпадают — стороны определены по порядку загрузки.';
 
 const shortOf = (r: AnalysisResult, e: Evidence) => {
   const d = r.documents.find((x) => x.side === e.side && x.name === e.docName);
   return d?.short ?? (e.side === 'before' ? 'до' : 'после');
 };
 
-const sourceLine = (r: AnalysisResult, e: Evidence) => `${shortOf(r, e)}, п. ${e.clauseId}: «${e.quote}»`;
+const sourceLine = (r: AnalysisResult, e: Evidence) =>
+  `${e.side === 'before' ? 'ДО' : 'ПОСЛЕ'} · ${shortOf(r, e)}, п. ${e.clauseId}: «${e.quote}»`;
 
 export type Reviews = Readonly<Record<string, FindingReview>>;
 
@@ -99,6 +111,7 @@ export function reportMarkdown(r: AnalysisResult, reviews: Reviews = {}): string
   out.push(`**Документы «до»:** ${docLabel(r, 'before')}  `);
   out.push(`**Документы «после»:** ${docLabel(r, 'after')}  `);
   out.push(`**Сформировано:** ${new Date(r.meta.generatedAt).toLocaleString('ru-RU')} · модель ${r.meta.model}`, '');
+  if (sameRequisites(r)) out.push(`> ${SAME_REQUISITES_NOTE}`, '');
   out.push(`**${reviewLine(r, reviews)}**`, '');
   out.push(`> ${r.conclusion.disclaimer}`, '');
 
@@ -189,6 +202,7 @@ export async function reportDocx(r: AnalysisResult, reviews: Reviews = {}): Prom
     p(`Документы «до»: ${docLabel(r, 'before')}`),
     p(`Документы «после»: ${docLabel(r, 'after')}`),
     p(`Сформировано: ${new Date(r.meta.generatedAt).toLocaleString('ru-RU')} · модель ${r.meta.model}`),
+    ...(sameRequisites(r) ? [p(SAME_REQUISITES_NOTE, { italic: true })] : []),
     p(reviewLine(r, reviews), { bold: true }),
     p(r.conclusion.disclaimer, { italic: true })
   );

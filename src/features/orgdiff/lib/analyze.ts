@@ -148,6 +148,19 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     (r) => `до: ${r.before.length} пунктов, после: ${r.after.length} пунктов`
   );
 
+  // Реквизиты «до» и «после» совпали (две версии без номера редакции) — различаем стороны явно.
+  const shortsOf = (side: DocSide) => docs.filter((d) => d.side === side).map((d) => meta.get(`${side}:${d.name}`)?.short ?? '').join('|');
+  if (shortsOf('before') === shortsOf('after')) {
+    for (const d of docs) {
+      const m = meta.get(`${d.side}:${d.name}`) ?? {};
+      const tag = d.side === 'before' ? 'до' : 'после';
+      meta.set(`${d.side}:${d.name}`, {
+        title: m.title ? `${m.title} (${tag})` : undefined,
+        short: m.short ? `${m.short} (${tag})` : tag
+      });
+    }
+  }
+
   // 2. Состав подразделений — правилом; если правило не сработало — LLM
   const structure = await step(
     'structure',
@@ -479,7 +492,10 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     'Итоговое аналитическое заключение',
     async () => {
       const digest = assembled.findings
-        .map((f) => `${f.id} [${f.kind}, ${f.severity}] ${f.title}. ${clip(f.detail, 700)} Источники: ${f.evidence.map((e) => `${e.side === 'before' ? 'до' : 'после'}${docTag(e.side, e.docName)} п. ${e.clauseId}`).join(', ')}`)
+        .map(
+          (f) =>
+            `${f.id} [${f.origin === 'preexisting' ? 'было ранее' : 'новое'}; ${f.kind}, ${f.severity}] ${f.title}. ${clip(f.detail, 700)}${f.recommendation ? ` Рекомендация вывода: ${clip(f.recommendation, 300)}` : ''} Источники: ${f.evidence.map((e) => `${e.side === 'before' ? 'до' : 'после'}${docTag(e.side, e.docName)} п. ${e.clauseId}`).join(', ')}`
+        )
         .join('\n');
       const d = await writeConclusion(digest);
       const ids = new Set(assembled.findings.map((f) => f.id));
@@ -533,7 +549,8 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
       unitsReorganized: units.filter((u) => u.status === 'reorganized').length,
       unitsRetained: units.filter((u) => u.status === 'retained').length,
       functionsLost: assembled.matches.filter((m) => m.status === 'lost').length,
-      findings: assembled.findings.length
+      findings: assembled.findings.length,
+      findingsNew: assembled.findings.filter((f) => f.origin !== 'preexisting').length
     },
     meta: {
       model: MODEL,
@@ -656,6 +673,18 @@ const GENERIC_DUTY =
   /по всему кругу вопросов|прочих поручений|профессионального уровня|запрашива\p{L}* у Руководителей Общества информаци|в разработке ВНД|в разработке проектов документации/iu;
 
 function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef, humanize, recipients, reasons }: AssembleInput) {
+  // Какие формулировки у каких носителей были в прежней редакции — для «новое / было ранее» и честных передач.
+  const beforeText = new Map<string, Set<string>>();
+  for (const f of fns.before) {
+    const k = norm(f.clause.text);
+    const set = beforeText.get(k) ?? new Set<string>();
+    f.holders.forEach((h) => set.add(h.key));
+    if (!f.holders.length) set.add('');
+    beforeText.set(k, set);
+  }
+  const hadBefore = (a: Fn, holderKey: string) => beforeText.get(norm(a.clause.text))?.has(holderKey) ?? false;
+  const existedBefore = (a: Fn) => a.holders.length ? a.holders.every((h) => hadBefore(a, h.key)) : beforeText.has(norm(a.clause.text));
+  const clauseExistedBefore = (c: ParsedClause) => parsed.before.some((b) => norm(b.text) === norm(c.text));
   for (const m of matchRows) m.explanation = humanize(m.explanation);
   const clauseOf = (side: DocSide, docName: string, id: string) =>
     parsed[side].find((c) => c.docName === docName && c.id === id);
@@ -690,12 +719,43 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     t[k]++;
     touched.set(key, t);
   };
+  // Функцию X «покрывает» только пункт другого носителя, который был у него и прежде:
+  // полное совпадение — у X снят дубль; частичное — у X функция утрачена (прежний пункт Y её лишь частично перекрывает).
+  for (const m of matchRows) {
+    // «Сужение», при котором утрачено ≥ 70% формулировки, — это потеря функции (частично покрытая).
+    if (m.fn && m.status === 'narrowed' && m.lostPart && norm(m.lostPart).length >= 0.7 * norm(m.fn.clause.text).length) {
+      m.status = 'lost';
+      m.partialLoss = true;
+      m.explanation = `Утрачена основная часть функции: «${m.lostPart}». ${m.explanation}`;
+      continue;
+    }
+    if (!m.fn || !m.after.length || !['moved', 'narrowed', 'expanded'].includes(m.status)) continue;
+    const own = (a: Fn) => a.holders.some((h) => m.fn!.holders.some((x) => x.key === h.key));
+    if (!m.after.every((a) => !own(a) && existedBefore(a))) continue;
+    const x = holderLabel(m.fn);
+    const y = holderLabel(m.after[0]);
+    if (m.status === 'narrowed') {
+      m.status = 'lost';
+      m.partialLoss = true;
+      m.explanation = `У ${x} функция снята; прежний пункт ${y} перекрывает её лишь частично. ${m.explanation}`;
+    } else {
+      m.status = 'kept';
+      m.explanation = `Функция по-прежнему выполняется ${y} (была у него и в прежней редакции); у ${x} формулировка снята — вероятно, устранено дублирование.`;
+    }
+  }
+
   for (const m of matchRows) {
     if (!m.fn) continue;
     if (m.status === 'lost') m.fn.holders.forEach((h) => bump(h.key, 'lost'));
     if (m.status === 'narrowed') m.fn.holders.forEach((h) => bump(h.key, 'narrowed'));
-    if (!m.after.length) continue;
-    const afterHolders = [...new Map(m.after.flatMap((a) => a.holders).map((h) => [h.key, h])).values()];
+    // Утраченная функция никуда не передана: частичное покрытие — не поток.
+    if (!m.after.length || m.status === 'lost') continue;
+    // Передача X → Y засчитывается, только если у Y этой функции прежде не было: иначе у X снят дубль.
+    const afterHolders = [
+      ...new Map(m.after.flatMap((a) => a.holders.filter((h) => !hadBefore(a, h.key))).map((h) => [h.key, h])).values(),
+      ...m.after.flatMap((a) => a.holders).filter((h) => m.fn!.holders.some((x) => x.key === h.key))
+    ];
+
     for (const b of m.fn.holders) {
       for (const a of afterHolders) {
         const kind = a.key === b.key ? 'retained' : m.fn.holders.some((h) => h.key === a.key) ? null : 'transferred';
@@ -719,6 +779,12 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     }
   }
   const flows = [...flowMap.values()];
+  // Статусы строк могли уточниться (снятый дубль → «сохранено») — синхронизируем таблицу.
+  for (const mm of matches) {
+    const row = matchRows.find((r) => r.id === mm.id)!;
+    mm.status = row.status;
+    mm.explanation = row.explanation;
+  }
 
   // --- подразделения
   const keys = [...new Set([...structure.before, ...structure.after].map((u) => u.key))];
@@ -751,7 +817,8 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     const pb = new Set(posB.map((p) => normPosition(p, u)));
     const pa = new Set(posA.map((p) => normPosition(p, u)));
     const posChanged = pb.size !== pa.size || [...pb].some((p) => !pa.has(p));
-    const status = !b ? 'created' : !a ? 'removed' : posChanged || t.in || t.out || t.lost || t.narrowed ? 'reorganized' : 'retained';
+    // «Реорганизовано» — только изменение состава/штата; изменение одних функций — «сохранено, изменён функционал».
+    const status = !b ? 'created' : !a ? 'removed' : posChanged ? 'reorganized' : 'retained';
 
     const receivedFrom = flows.filter((f) => f.to === unitId(key) && f.kind === 'transferred');
     const gaveTo = flows.filter((f) => f.from === unitId(key) && f.kind === 'transferred');
@@ -763,7 +830,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     if (status === 'created') parts.push('Создано');
     const into = transformedInto.get(unitId(key));
     if (status === 'removed') parts.push(into ? `Преобразовано в ${labelOfKey(into)}` : u.kind === 'position' ? 'Должность упразднена' : 'Упразднено');
-    if (status === 'retained') parts.push('Сохранено без изменений');
+    if (status === 'retained') parts.push(t.in || t.out || t.lost || t.narrowed ? 'Сохранено, изменён функционал' : 'Сохранено без изменений');
     if (status === 'reorganized') parts.push('Сохранено с изменениями');
     if (receivedFrom.length) parts.push(`получило функции от: ${receivedFrom.map((f) => `${label(f.from)} (${f.functionCount})`).join(', ')}`);
     if (gaveTo.length) parts.push(`передало функции: ${gaveTo.map((f) => `${label(f.to)} (${f.functionCount})`).join(', ')}`);
@@ -910,6 +977,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     const dup = v.verdict === 'duplication';
     const generic = GENERIC_DUTY.test(p.a.clause.text) && GENERIC_DUTY.test(p.b.clause.text);
     raw.push({
+      origin: existedBefore(p.a) && existedBefore(p.b) ? 'preexisting' : 'new',
       kind: dup ? 'function_duplicated' : 'responsibility_overlap',
       severity: generic ? 'low' : dup ? 'high' : 'medium',
       title: `${dup ? 'Признаки дублирования' : 'Пересечение зон ответственности'}: ${holderLabel(p.a)} и ${holderLabel(p.b)} — «${clip(p.a.clause.text, 70)}»`,
@@ -940,7 +1008,9 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     const holderIds = structure.after
       .filter((u) => c.holders.some((h) => norm(h) === norm(u.name) || h === u.abbr))
       .map((u) => unitId(u.key));
+    const coiClauses = c.refs.map((r) => afterRef.get(r.ref)?.clause).filter((x): x is ParsedClause => !!x);
     raw.push({
+      origin: coiClauses.length && coiClauses.every(clauseExistedBefore) ? 'preexisting' : 'new',
       kind: 'conflict_of_interest',
       severity: c.severity,
       title: c.title,
@@ -980,12 +1050,13 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
   }
 
   for (const f of raw) {
+    f.origin ??= 'new';
     if (f.matchIds) f.matchIds = [...new Set(f.matchIds)];
     f.title = humanize(f.title);
     if (f.recommendation) f.recommendation = humanize(f.recommendation);
     const seen = new Set<string>();
     f.evidence = f.evidence.filter((e) => {
-      const k = `${e.side}|${e.docName}|${e.clauseId}|${e.quote}`;
+      const k = `${e.side}|${e.docName}|${e.clauseId}`;
       return seen.has(k) ? false : (seen.add(k), true);
     });
   }
@@ -1002,7 +1073,12 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
   const order = { high: 0, medium: 1, low: 2 } as const;
   const kindOrder = ['unit_removed', 'unit_created', 'unit_reorganized', 'function_lost', 'function_narrowed', 'function_duplicated', 'responsibility_overlap', 'conflict_of_interest', 'doc_defect'];
   const findings: Finding[] = kept
-    .sort((a, b) => kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) || order[a.severity] - order[b.severity])
+    .sort(
+      (a, b) =>
+        Number(a.origin === 'preexisting') - Number(b.origin === 'preexisting') ||
+        kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) ||
+        order[a.severity] - order[b.severity]
+    )
     .map((f, i) => ({ ...f, id: `F${i + 1}` }));
 
   return { units, flows, functions, matches, findings, dropped: raw.length - kept.length, unverified };
@@ -1062,7 +1138,7 @@ function redistribution(fn: Fn, rs: Recipient[], reason?: string): Pick<Finding,
   const prev = fn.holders.map(name).join(', ');
   const same = fn.holders.some((h) => h.key === first.unit.key);
   const text =
-    `Закрепить функцию за ${name(first.unit)}${same ? ' (прежний носитель)' : prev ? ` (прежде — ${prev})` : ''}: ` +
+    `Предлагаемый ответственный — ${name(first.unit)}${same ? ' (прежний носитель)' : prev ? ` (прежде — ${prev})` : ''}: ` +
     (reason ? `${reason.replace(/\.$/, '')} (п. ${first.clause.clause.id}).` : `в новой редакции ему ближе всего по смыслу п. ${first.clause.clause.id} «${clip(first.clause.clause.text, 90)}».`) +
     (second && !reason ? ` Альтернатива — ${name(second.unit)} (п. ${second.clause.clause.id}).` : '');
   return {

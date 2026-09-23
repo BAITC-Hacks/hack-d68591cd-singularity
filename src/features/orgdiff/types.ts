@@ -176,6 +176,8 @@ export interface Finding {
   matchIds?: string[];
   /** Оговорка: что требует проверки сотрудником */
   caveat?: string;
+  /** new — изменение новой редакции; preexisting — было и в прежней редакции (замечание к структуре в целом) */
+  origin?: 'new' | 'preexisting';
 }
 
 export interface EvidencePair {
@@ -266,6 +268,8 @@ export interface AnalysisResult {
     unitsRetained: number;
     functionsLost: number;
     findings: number;
+    /** Выводы об изменениях (origin = new) */
+    findingsNew?: number;
   };
   meta: {
     model: string;
