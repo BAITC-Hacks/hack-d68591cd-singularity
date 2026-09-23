@@ -22,7 +22,13 @@ const ROLE_HEADER = /^(главн\p{L}*\s+аудитор|директор|рук
 
 export const clauseUid = (c: ParsedClause) => `${c.side}:${c.docName}:${c.id}`;
 
-export function buildFunctions(clauses: ParsedClause[], units: UnitDef[], side: DocSide): Fn[] {
+/** Документы комплекта: носитель по умолчанию и распорядительные документы (приказ), где пункты — поручения, а не функции. */
+export interface DocContext {
+  owners?: Map<string, UnitDef>;
+  orders?: Set<string>;
+}
+
+export function buildFunctions(clauses: ParsedClause[], units: UnitDef[], side: DocSide, docs: DocContext = {}): Fn[] {
   const byDoc = new Map<string, Map<string, ParsedClause>>();
   for (const c of clauses) {
     if (!byDoc.has(c.docName)) byDoc.set(c.docName, new Map());
@@ -33,7 +39,7 @@ export function buildFunctions(clauses: ParsedClause[], units: UnitDef[], side: 
   const out: Fn[] = [];
   for (const c of clauses) {
     // Строки таблицы оргструктуры описывают состав, а не функции — их разбирает units.ts.
-    if (c.cells || NON_FUNCTION_SECTION.test(c.sectionTitle)) continue;
+    if (c.cells || NON_FUNCTION_SECTION.test(c.sectionTitle) || docs.orders?.has(c.docName)) continue;
     const text = c.text.trim();
     if (norm(text).length < 15) continue;
     // Вводные строки перечней («5.3. Директор ДОА:», «…осуществляет следующие функции:») — не функции.
@@ -47,7 +53,7 @@ export function buildFunctions(clauses: ParsedClause[], units: UnitDef[], side: 
       ref: `${side === 'before' ? 'B' : 'A'}${out.length + 1}`,
       side,
       clause: c,
-      holders: holdersOf(c, byId, units),
+      holders: holdersOf(c, byId, units, docs.owners?.get(c.docName)),
       context: parent && parent.text.trim().endsWith(':') ? clip(parent.text, 200) : ''
     });
   }

@@ -89,6 +89,8 @@ export interface UnitFunction {
   side: DocSide;
   /** UnitChange.id носителей; пусто — функция закреплена за блоком в целом */
   unitIds: string[];
+  /** Документ комплекта, где стоит пункт: номера пунктов в разных документах совпадают */
+  docName?: string;
   /** Нормализованная формулировка: «действие + объект» */
   text: string;
   clauseId: string;

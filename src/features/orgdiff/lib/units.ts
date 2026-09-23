@@ -212,17 +212,81 @@ export function resolveHolders(text: string, units: UnitDef[], opts: { strict?: 
   return [];
 }
 
+/** Шапка документа комплекта: вид и предмет («Положение о Департаменте …», «Должностная инструкция Директора ДНМ»). */
+export interface DocHead {
+  kind?: 'regulation' | 'job' | 'order';
+  /** Предмет документа без вводного слова: «ДЕПАРТАМЕНТЕ НЕПРЕРЫВНОГО МОНИТОРИНГА …», «Директора ДНМ» */
+  subject?: string;
+}
+
+/** Первое слово предмета — подразделение или должность, а не тема («о внутреннем аудите»). */
+const SUBJECT_HEAD =
+  /^(?:департамент|управлени|отдел|служб|дирекци|блок|центр|сектор|групп|бюро|лаборатори|филиал|представительств|директор|руководител|начальник|заместител|главн|ведущ|старш|менеджер|специалист|аудитор)/iu;
+
+export function docHead(text: string): DocHead {
+  const lines = text.slice(0, 2000).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const i = lines.findIndex((l) => /^(?:ПОЛОЖЕНИЕ|ДОЛЖНОСТНАЯ\s+ИНСТРУКЦИЯ|ПРИКАЗ|РАСПОРЯЖЕНИЕ)(?![\p{L}])/u.test(l));
+  if (i < 0) return {};
+  if (/^(?:ПРИКАЗ|РАСПОРЯЖЕНИЕ)/u.test(lines[i])) return { kind: 'order' };
+  // «ПОЛОЖЕНИЕ» и «О ДЕПАРТАМЕНТЕ …» часто стоят на разных строках; редакция, дата и первый пункт — уже не название.
+  let head = lines[i];
+  for (let k = i + 1; k < Math.min(lines.length, i + 3) && !/^(?:\d|\(|от\s|утвержд)/iu.test(lines[k]); k++) head += ` ${lines[k]}`;
+  const m = head
+    .replace(/\(редакци[^)]*\)/iu, '')
+    .trim()
+    .match(/^(положени\p{L}*\s+(?:о|об)|должностн\p{L}*\s+инструкци\p{L}*)\s+(.{2,200})$/iu);
+  if (!m) return {};
+  return { kind: m[1].toLowerCase().startsWith('положени') ? 'regulation' : 'job', subject: m[2].trim() };
+}
+
+/**
+ * Носитель по умолчанию для документа о конкретном подразделении или должности: предмет из шапки,
+ * сопоставленный с составом структуры по аббревиатуре и основам наименования. «Положение о внутреннем
+ * аудите» (документ о блоке в целом) и неоднозначный предмет носителя не дают.
+ */
+export function docOwner(head: DocHead, units: UnitDef[]): UnitDef | undefined {
+  if (!head.subject || head.kind === 'order') return undefined;
+  const known = units.some((u) => u.abbr && new RegExp(`^${u.abbr}(?![\\p{L}])`, 'u').test(head.subject!));
+  if (!known && !SUBJECT_HEAD.test(head.subject)) return undefined;
+  const hits = resolveHolders(head.subject, units, { strict: true });
+  return hits.length === 1 ? hits[0] : undefined;
+}
+
+/**
+ * «Департамент имеет право…», «Работники Департамента несут…» в положении о департаменте — это сам
+ * предмет документа, а не другое подразделение, упомянутое дальше в тексте пункта.
+ */
+function isSelfReference(text: string, owner: UnitDef, units: UnitDef[]): boolean {
+  if (owner.kind !== 'unit') return false;
+  const type = norm(owner.name.split(/\s+/)[0]);
+  const stem = type.slice(0, Math.max(4, type.length - 2));
+  const m = text.match(new RegExp(`^(?:(?:директор|руководител|начальник|заместител|работник|сотрудник)\\p{L}*\\s+)?${stem}\\p{L}*(?![\\p{L}-])\\s*(.*)$`, 'isu'));
+  if (!m) return false;
+  // «Департамент ИТ-аудита …» — другое подразделение, названное по имени.
+  const rest = norm(m[1].slice(0, 160));
+  const named = units.find((u) => {
+    if (u.kind !== 'unit') return false;
+    if (u.abbr && new RegExp(`^${u.abbr.toLowerCase()}(?![\\p{L}])`, 'u').test(rest)) return true;
+    const core = stemRegex(u.name.split(/\s+/).slice(1).join(' '));
+    return core ? new RegExp(`^${core.source}`, 'iu').test(rest) : false;
+  });
+  return !named || named.key === owner.key;
+}
+
 /**
  * Носители функции, описанной пунктом: явная пометка «(ДИТААД)» в самом пункте,
  * иначе ближайший предок-заголовок роли («5.3. Директор направления …:»),
  * иначе ненумерованный заголовок («Главный аудитор:»). Пусто — функция блока в целом.
+ * owner — носитель по умолчанию из шапки документа («Положение о Департаменте …»): в таком документе
+ * пункт без явного носителя принадлежит этому подразделению, а не блоку в целом.
  */
-export function holdersOf(c: ParsedClause, byId: Map<string, ParsedClause>, units: UnitDef[]): UnitDef[] {
+export function holdersOf(c: ParsedClause, byId: Map<string, ParsedClause>, units: UnitDef[], owner?: UnitDef): UnitDef[] {
   const tag = c.text.match(/\(([А-ЯЁA-Z]{2,12})\)\s*[.;]?\s*$/u);
   if (tag) {
     const u = units.find((x) => x.abbr === tag[1]);
     if (u) return [u];
   }
+  if (owner && isSelfReference(c.text, owner, units)) return [owner];
   if (ROLE_START.test(c.text) && c.text.length < 400) {
     if (/работник\p{L}*\s+БВА|БВА\s+в\s+своей/iu.test(c.text.slice(0, 80))) return [];
     const own = resolveHolders(c.text.slice(0, 120), units);
@@ -237,8 +301,11 @@ export function holdersOf(c: ParsedClause, byId: Map<string, ParsedClause>, unit
     }
     p = p.parentId ? byId.get(p.parentId) : undefined;
   }
-  if (c.roleHint) return resolveHolders(c.roleHint, units, { strict: true });
-  return [];
+  if (c.roleHint) {
+    const hs = resolveHolders(c.roleHint, units, { strict: true });
+    if (hs.length || !owner) return hs;
+  }
+  return owner ? [owner] : [];
 }
 
 export const evidenceOf = (u: UnitDef, docName: string): Evidence => ({

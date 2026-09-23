@@ -9,7 +9,7 @@ export function ClauseRef({ fn }: { fn: UnitFunction }) {
   return (
     <div className='flex flex-col gap-0.5'>
       <span className='text-muted-foreground text-xs tabular-nums'>
-        {docLabel(fn.side)} п. {fn.clauseId}
+        {docLabel(fn.side, fn.docName)} п. {fn.clauseId}
       </span>
       <p className='line-clamp-3 text-sm leading-snug' title={fn.text}>
         {fn.quote}
