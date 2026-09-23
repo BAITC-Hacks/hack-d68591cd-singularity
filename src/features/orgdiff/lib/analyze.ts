@@ -234,6 +234,8 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
   // Переименование/преобразование: X есть только «до», Y — только «после», и большая часть функций X дословно у Y.
   // Это одно подразделение под новым названием, а не пара «упразднено + создано».
   const renamed = new Map<string, string>();
+  /** Пары [новое сокращение, прежнее] переименованных подразделений — для сравнения текстов с прежней редакцией. */
+  const renameAbbr: [string, string][] = [];
   for (const x of structure.before.filter((u) => !structure.after.some((a) => a.key === u.key))) {
     const xs = fns.before.filter((f) => f.holders.includes(x));
     if (xs.length < 3) continue;
@@ -245,6 +247,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     }
     if (best && bestN >= 0.6 * xs.length) {
       renamed.set(best.key, `${x.name}${x.abbr ? ` (${x.abbr})` : ''}`);
+      if (best.abbr && x.abbr) renameAbbr.push([best.abbr, x.abbr]);
       x.key = best.key;
     }
   }
@@ -505,7 +508,8 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
           return s ? [s, ...recipients(f).filter((r) => r.unit.key !== s.unit.key)] : recipients(f);
         },
         reasons: (f) => suggestions.get(f.ref)?.reason,
-        renamed
+        renamed,
+        renameAbbr
       }),
     (r) => `выводов: ${r.findings.length}; отброшено без подтверждённой цитаты: выводов ${r.dropped}, цитат ${r.unverified}`
   );
@@ -698,6 +702,7 @@ interface AssembleInput {
   recipients: (f: Fn) => Recipient[];
   reasons: (f: Fn) => string | undefined;
   renamed: Map<string, string>;
+  renameAbbr: [string, string][];
 }
 
 interface Recipient {
@@ -713,19 +718,29 @@ const RECIPIENT_MIN_SCORE = 0.45;
 const GENERIC_DUTY =
   /по всему кругу вопросов|прочих поручений|профессионального уровня|запрашива\p{L}* у Руководителей Общества информаци|в разработке ВНД|в разработке проектов документации/iu;
 
-function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef, humanize, recipients, reasons, renamed }: AssembleInput) {
+function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef, humanize, recipients, reasons, renamed, renameAbbr }: AssembleInput) {
+  // Новое сокращение переименованного подразделения → прежнее: «Директор ДНМАД» сравнивается с «Директор ДНМ».
+  const unalias = (t: string) =>
+    renameAbbr.reduce((acc, [nw, old]) => acc.replace(new RegExp(`(?<!\\p{L})${nw}(?!\\p{L})`, 'gu'), old), t);
   // Какие формулировки у каких носителей были в прежней редакции — для «новое / было ранее» и честных передач.
-  const beforeText = new Map<string, Set<string>>();
-  for (const f of fns.before) {
-    const k = norm(f.clause.text);
-    const set = beforeText.get(k) ?? new Set<string>();
-    f.holders.forEach((h) => set.add(h.key));
-    if (!f.holders.length) set.add('');
-    beforeText.set(k, set);
-  }
-  const hadBefore = (a: Fn, holderKey: string) => beforeText.get(norm(a.clause.text))?.has(holderKey) ?? false;
-  const existedBefore = (a: Fn) => a.holders.length ? a.holders.every((h) => hadBefore(a, h.key)) : beforeText.has(norm(a.clause.text));
-  const clauseExistedBefore = (c: ParsedClause) => parsed.before.some((b) => norm(b.text) === norm(c.text));
+  // Строится лениво — уже после распознавания переименований (ключи носителей к тому моменту объединены).
+  let beforeTextCache: Map<string, Set<string>> | undefined;
+  const beforeText = () => {
+    if (beforeTextCache) return beforeTextCache;
+    beforeTextCache = new Map<string, Set<string>>();
+    for (const f of fns.before) {
+      const k = norm(f.clause.text);
+      const set = beforeTextCache.get(k) ?? new Set<string>();
+      f.holders.forEach((h) => set.add(h.key));
+      if (!f.holders.length) set.add('');
+      beforeTextCache.set(k, set);
+    }
+    return beforeTextCache;
+  };
+  const hadBefore = (a: Fn, holderKey: string) => beforeText().get(norm(unalias(a.clause.text)))?.has(holderKey) ?? false;
+  const existedBefore = (a: Fn) =>
+    a.holders.length ? a.holders.every((h) => hadBefore(a, h.key)) : beforeText().has(norm(unalias(a.clause.text)));
+  const clauseExistedBefore = (c: ParsedClause) => parsed.before.some((b) => norm(b.text) === norm(unalias(c.text)));
 
   // Переименование по итоговому сопоставлению (в т.ч. через ИИ): большинство функций упразднённого X перешли
   // к одному новому Y — заметно больше, чем к любому другому. Тогда это одно подразделение под новым названием.
@@ -744,6 +759,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     if (!first || first[1] < 0.5 * rows.length || (second && first[1] < 1.5 * second[1])) continue;
     const y = first[0];
     renamed.set(y.key, `${x.name}${x.abbr ? ` (${x.abbr})` : ''}`);
+    if (y.abbr && x.abbr) renameAbbr.push([y.abbr, x.abbr]);
     x.key = y.key;
     for (const m of rows) {
       if (m.status === 'moved' && m.after.some((f) => f.holders.includes(y))) {
@@ -882,7 +898,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     const posB = b?.positions ?? [];
     const posA = a?.positions ?? [];
     const pb = new Set(posB.map((p) => normPosition(p, u)));
-    const pa = new Set(posA.map((p) => normPosition(p, u)));
+    const pa = new Set(posA.map((p) => normPosition(unalias(p), u)));
     const posChanged = pb.size !== pa.size || [...pb].some((p) => !pa.has(p));
     // «Реорганизовано» — только изменение состава/штата; изменение одних функций — «сохранено, изменён функционал».
     const formerName = renamed.get(key);
