@@ -3,7 +3,14 @@
 import { parseAsString, parseAsStringLiteral, useQueryStates } from 'nuqs';
 import { encodeSourceKey, type SourceKey } from '../utils/evidence-source';
 
-export const ORGDIFF_TABS = ['upload', 'chart', 'functions', 'findings', 'conclusion'] as const;
+export const ORGDIFF_TABS = [
+  'upload',
+  'chart',
+  'functions',
+  'findings',
+  'compliance',
+  'conclusion'
+] as const;
 export type OrgdiffTab = (typeof ORGDIFF_TABS)[number];
 
 /**

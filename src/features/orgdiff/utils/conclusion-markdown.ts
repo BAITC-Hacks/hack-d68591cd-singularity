@@ -1,5 +1,6 @@
 import type { FindingReviews } from '../hooks/use-finding-reviews';
 import type { AnalysisResult, DocSide } from '../types';
+import { COMPLIANCE_STATUS_META, COMPLIANCE_STATUSES } from './compliance-meta';
 
 const REVIEW_MARK = { confirmed: 'подтверждено', rejected: 'отклонено сотрудником' } as const;
 
@@ -32,6 +33,7 @@ export function conclusionMarkdown(result: AnalysisResult, reviews: FindingRevie
       '',
       ...(section.findingIds.length > 0 ? [`_Основание: ${refs(section.findingIds)}_`, ''] : [])
     ]),
+    ...complianceLines(result),
     '## Рекомендации',
     '',
     ...conclusion.recommendations.map(
@@ -67,4 +69,28 @@ export function formatDate(iso: string): string {
 function findingRef(id: string, reviews: FindingReviews): string {
   const review = reviews[id];
   return review ? `${id} — ${REVIEW_MARK[review]}` : id;
+}
+
+/** «Выполнено — 1, частично — 10, …» по статусам, которые встречаются в сверке */
+export function complianceCounts(result: AnalysisResult): string | null {
+  const items = result.compliance ?? [];
+  if (items.length === 0) return null;
+  return COMPLIANCE_STATUSES.map((status) => ({
+    label: COMPLIANCE_STATUS_META[status].label.toLowerCase(),
+    count: items.filter((item) => item.status === status).length
+  }))
+    .filter(({ count }) => count > 0)
+    .map(({ label, count }) => `${label} — ${count}`)
+    .join(', ');
+}
+
+function complianceLines(result: AnalysisResult): string[] {
+  const counts = complianceCounts(result);
+  if (!counts) return [];
+  return [
+    '## Сверка с внешними требованиями',
+    '',
+    `Стандарты IIA и законодательство об АО, требований: ${result.compliance?.length ?? 0} (${counts}). Ориентир для проверки, не юридическое заключение.`,
+    ''
+  ];
 }

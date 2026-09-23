@@ -2,11 +2,13 @@
 
 import { useMemo } from 'react';
 import { Icons } from '@/components/icons';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useFindingReviews } from '../../hooks/use-finding-reviews';
-import { useOpenSource } from '../../hooks/use-orgdiff-params';
+import { useOpenSource, useOrgdiffParams } from '../../hooks/use-orgdiff-params';
 import type { AnalysisResult } from '../../types';
 import {
+  complianceCounts,
   conclusionMarkdown,
   docTitles,
   formatDate,
@@ -21,6 +23,8 @@ export function ConclusionView({ result }: { result: AnalysisResult }) {
   const { conclusion } = result;
   const { reviews } = useFindingReviews(result);
   const openSource = useOpenSource();
+  const [, setParams] = useOrgdiffParams();
+  const compliance = complianceCounts(result);
   const findings = useMemo(
     () => new Map(result.findings.map((finding) => [finding.id, finding])),
     [result.findings]
@@ -58,7 +62,7 @@ export function ConclusionView({ result }: { result: AnalysisResult }) {
         <p className='leading-relaxed'>{conclusion.summary}</p>
       </Section>
 
-      <Section title='2. Изменения структуры'>
+      <Section title='2. Состав подразделений'>
         <ul className='flex flex-col divide-y rounded-md border'>
           {result.units.map((unit) => {
             const meta = UNIT_STATUS_META[unit.status];
@@ -90,7 +94,25 @@ export function ConclusionView({ result }: { result: AnalysisResult }) {
         </Section>
       ))}
 
-      <Section title={`${conclusion.sections.length + 3}. Рекомендации`}>
+      {compliance ? (
+        <Section title={`${conclusion.sections.length + 3}. Сверка с внешними требованиями`}>
+          <p className='leading-relaxed'>
+            Стандарты IIA и законодательство об АО, требований: {result.compliance?.length} (
+            {compliance}). Ориентир для проверки, не юридическое заключение.
+          </p>
+          <Button
+            variant='outline'
+            size='sm'
+            className='w-fit'
+            onClick={() => void setParams({ tab: 'compliance' })}
+          >
+            Открыть требования
+            <Icons.arrowRight />
+          </Button>
+        </Section>
+      ) : null}
+
+      <Section title={`${conclusion.sections.length + (compliance ? 4 : 3)}. Рекомендации`}>
         <ol className='flex list-decimal flex-col gap-3 pl-5'>
           {conclusion.recommendations.map((item) => (
             <li key={item.text} className='flex flex-col gap-1 pl-1'>

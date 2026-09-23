@@ -9,6 +9,7 @@ import {
   type FunctionMatch,
   type UnitFunction
 } from '../types';
+import { COMPLIANCE_STATUS_META } from './compliance-meta';
 import { MATCH_STATUS_META } from './match-status';
 import { UNIT_STATUS_META, unitLabel } from './unit-status';
 
@@ -17,6 +18,7 @@ export type SourceKey =
   | { kind: 'finding'; id: string }
   | { kind: 'match'; id: string }
   | { kind: 'unit'; id: string }
+  | { kind: 'requirement'; id: string }
   | { kind: 'flow'; from: string; to: string };
 
 /** Ссылка на пункт: Evidence или функция из сопоставления */
@@ -73,7 +75,9 @@ export function decodeSourceKey(value: string | null): SourceKey | null {
     const [from, to] = rest.split('>');
     return from && to ? { kind, from, to } : null;
   }
-  if (kind === 'finding' || kind === 'match' || kind === 'unit') return { kind, id: rest };
+  if (kind === 'finding' || kind === 'match' || kind === 'unit' || kind === 'requirement') {
+    return { kind, id: rest };
+  }
   return null;
 }
 
@@ -87,6 +91,8 @@ export function resolveSource(result: AnalysisResult, key: SourceKey): SourceVie
       return unitSource(result, key.id);
     case 'flow':
       return flowSource(result, key.from, key.to);
+    case 'requirement':
+      return requirementSource(result, key.id);
   }
 }
 
@@ -184,6 +190,20 @@ function flowSource(result: AnalysisResult, from: string, to: string): SourceVie
       result,
       flowMatches.map((match) => match.id)
     )
+  };
+}
+
+function requirementSource(result: AnalysisResult, id: string): SourceView | null {
+  const item = result.compliance?.find((requirement) => requirement.requirementId === id);
+  if (!item) return null;
+  return {
+    title: item.requirement,
+    subtitle: `${item.source} · ${COMPLIANCE_STATUS_META[item.status].label}`,
+    detail: item.note,
+    // Цитаты — пункты новой редакции, сравнивать с «до» нечего
+    comparison: false,
+    pairs: evidenceToPairs(item.evidence),
+    findingIds: []
   };
 }
 
