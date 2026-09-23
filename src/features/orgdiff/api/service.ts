@@ -18,6 +18,8 @@ export interface AnalyzePayload {
 
 const MOCK_JOB_PREFIX = 'mock-';
 
+export type ReportFormat = 'docx' | 'md';
+
 export async function startAnalysis(payload: AnalyzePayload): Promise<string> {
   if (USE_MOCK) return `${MOCK_JOB_PREFIX}${Date.now()}`;
 
@@ -130,4 +132,22 @@ function sanitizeResult(result: AnalysisResult): AnalysisResult {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+/** Задачи мока живут только в браузере — у сервера для них отчёта нет */
+export function canDownloadReport(jobId: string | undefined): jobId is string {
+  return jobId !== undefined && !jobId.startsWith(MOCK_JOB_PREFIX);
+}
+
+/** Файл заключения от пайплайна: GET /api/analyze/{jobId}/report?format=… */
+export async function downloadReport(jobId: string, format: ReportFormat): Promise<Blob> {
+  const res = await fetch(
+    `${ANALYZE_ENDPOINT}/${encodeURIComponent(jobId)}/report?format=${format}`
+  );
+  if (!res.ok) {
+    const data: unknown = await res.json().catch(() => null);
+    const message = isRecord(data) && typeof data.error === 'string' ? data.error : null;
+    throw new Error(message ?? `Не удалось сформировать файл (${res.status})`);
+  }
+  return res.blob();
 }

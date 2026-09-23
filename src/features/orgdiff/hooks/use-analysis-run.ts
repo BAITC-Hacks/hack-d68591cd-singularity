@@ -32,8 +32,10 @@ export function useAnalysisRun(): AnalysisRun {
   const result = job.data?.status === 'done' ? job.data.result : undefined;
 
   useEffect(() => {
-    if (result) queryClient.setQueryData(orgdiffKeys.result(), result);
-  }, [queryClient, result]);
+    if (!result || !jobId) return;
+    queryClient.setQueryData(orgdiffKeys.result(), result);
+    queryClient.setQueryData(orgdiffKeys.resultJobId(), jobId);
+  }, [queryClient, result, jobId]);
 
   const error = startMutation.error?.message ?? job.error?.message ?? getJobError(job.data);
 
