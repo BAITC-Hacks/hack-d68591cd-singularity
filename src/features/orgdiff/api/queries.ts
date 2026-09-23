@@ -31,6 +31,8 @@ export const analysisJobOptions = (jobId: string | null) =>
     queryKey: orgdiffKeys.job(jobId),
     queryFn: jobId ? () => getAnalysisJob(jobId) : skipToken,
     refetchInterval: (query) => (query.state.data?.status === 'running' ? JOB_POLL_MS : false),
+    // Анализ идёт до ~3 минут: пользователь может уйти на другую вкладку — не останавливаем опрос
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: false,
     retry: 1,
     staleTime: Infinity

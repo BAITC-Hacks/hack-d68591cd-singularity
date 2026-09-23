@@ -181,6 +181,8 @@ function flowEdge(flow: UnitFlow): FlowEdge {
 }
 
 function docNames(result: AnalysisResult, side: DocSide): string {
-  const names = result.documents.filter((doc) => doc.side === side).map((doc) => doc.name);
+  const names = result.documents
+    .filter((doc) => doc.side === side)
+    .map((doc) => doc.title ?? doc.name);
   return names.join(', ') || '—';
 }

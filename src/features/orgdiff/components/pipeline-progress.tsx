@@ -4,7 +4,6 @@ import { Icons } from '@/components/icons';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { EXPECTED_TRACE_STEPS } from '../constants';
 import type { RunStatus } from '../hooks/use-analysis-run';
 import type { TraceStep } from '../types';
 
@@ -63,6 +62,7 @@ function TraceStepItem({ index, step }: { index: number; step: TraceStep }) {
       className={cn(
         'flex items-start gap-3 rounded-md px-2 py-1.5',
         step.status === 'running' && 'bg-primary/5',
+        step.status === 'pending' && 'opacity-50',
         step.status === 'error' && 'bg-destructive/5'
       )}
     >
@@ -91,11 +91,18 @@ function StepIcon({ status }: { status: TraceStep['status'] }) {
   if (status === 'error') {
     return <Icons.circleX className={cn(className, 'text-destructive')} aria-label='ошибка' />;
   }
+  if (status === 'pending') {
+    return <Icons.circle className={cn(className, 'text-muted-foreground')} aria-label='ожидает' />;
+  }
   return <Icons.minus className={cn(className, 'text-muted-foreground')} aria-label='пропущен' />;
 }
 
+/** План шагов приходит сразу (pending), поэтому процент — доля завершённых из всего trace */
 function getPercent(status: RunStatus, trace: TraceStep[]): number {
   if (status === 'done') return 100;
-  const finished = trace.filter((step) => step.status !== 'running').length;
-  return Math.min(95, Math.round((finished / EXPECTED_TRACE_STEPS) * 100));
+  if (trace.length === 0) return 0;
+  const finished = trace.filter(
+    (step) => step.status === 'done' || step.status === 'skipped'
+  ).length;
+  return Math.min(95, Math.round((finished / trace.length) * 100));
 }

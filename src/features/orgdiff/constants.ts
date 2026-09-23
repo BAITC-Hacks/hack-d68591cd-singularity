@@ -9,9 +9,6 @@ export const JOB_POLL_MS = 1500;
 /** Мок проигрывает trace из mock.json с такой скоростью на шаг */
 export const MOCK_STEP_MS = 450;
 
-/** Сколько шагов обычно в trace пайплайна — для полосы прогресса до прихода результата */
-export const EXPECTED_TRACE_STEPS = 11;
-
 export const ANALYZE_ENDPOINT = '/api/analyze';
 
 export const ACCEPTED_FILES = {
