@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAnalysisResult } from '../api/queries';
 import { useOrgdiffParams, type OrgdiffTab } from '../hooks/use-orgdiff-params';
 import type { AnalysisResult } from '../types';
+import { FunctionTable } from './function-table/function-table';
 import { OrgChart } from './org-chart/org-chart';
 import { ResultPlaceholder } from './result-placeholder';
 import { UploadPanel } from './upload-panel';
@@ -70,6 +71,15 @@ interface ResultTabContentProps {
 
 function ResultTabContent({ tab, result, ...chartProps }: ResultTabContentProps) {
   if (tab === 'chart') return <OrgChart result={result} {...chartProps} />;
+  if (tab === 'functions') {
+    return (
+      <FunctionTable
+        result={result}
+        unit={chartProps.selectedUnitId}
+        onUnitChange={chartProps.onSelectUnit}
+      />
+    );
+  }
   return (
     <ResultPlaceholder title='Экран в разработке' description='Появится в следующих задачах.' />
   );

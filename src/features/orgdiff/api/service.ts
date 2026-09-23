@@ -9,7 +9,7 @@
 // ============================================================
 
 import { ANALYZE_ENDPOINT, MOCK_STEP_MS, SAMPLE_SET, USE_MOCK } from '../constants';
-import type { AnalysisJob, AnalysisResult, DocSide } from '../types';
+import type { AnalysisJob, AnalysisResult, DocSide, TraceStep } from '../types';
 
 export interface AnalyzePayload {
   before: File[];
@@ -76,11 +76,12 @@ async function getMockJob(jobId: string): Promise<AnalysisJob> {
     return { id: jobId, status: 'done', trace: result.trace, result: structuredClone(result) };
   }
 
-  const trace = result.trace
-    .slice(0, doneSteps + 1)
-    .map((step, index) =>
-      index < doneSteps ? step : { ...step, status: 'running' as const, detail: undefined }
-    );
+  // Как живой API: весь план сразу, будущие шаги — pending
+  const trace = result.trace.map((step, index): TraceStep => {
+    if (index < doneSteps) return step;
+    const status = index === doneSteps ? 'running' : 'pending';
+    return { ...step, status, detail: undefined, finishedAt: undefined };
+  });
   return { id: jobId, status: 'running', trace };
 }
 

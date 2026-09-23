@@ -2,18 +2,18 @@
 
 import { Icons } from '@/components/icons';
 import { cn } from '@/lib/utils';
+import { useDocLabel } from '../hooks/use-doc-label';
 import type { Evidence } from '../types';
-
-const SIDE_SHORT = { before: 'до', after: 'после' } as const;
 
 interface EvidenceChipProps {
   evidence: Evidence;
   onClick?: (evidence: Evidence) => void;
 }
 
-/** «после · п. 3.4.в ✓» — источник вывода; цитата во всплывающей подсказке */
+/** «ред. 9 п. 3.4.в ✓» — источник вывода; цитата во всплывающей подсказке */
 export function EvidenceChip({ evidence, onClick }: EvidenceChipProps) {
-  const label = `${SIDE_SHORT[evidence.side]} · п. ${evidence.clauseId}`;
+  const docLabel = useDocLabel();
+  const label = `${docLabel(evidence.side, evidence.docName)} п. ${evidence.clauseId}`;
   const title = `${evidence.docName}, п. ${evidence.clauseId}: «${evidence.quote}»`;
   const className = cn(
     'inline-flex h-6 items-center gap-1 rounded-md border px-1.5 text-xs tabular-nums',
