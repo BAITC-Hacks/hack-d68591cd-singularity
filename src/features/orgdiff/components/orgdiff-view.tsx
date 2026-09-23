@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAnalysisResult } from '../api/queries';
 import { useOrgdiffParams, type OrgdiffTab } from '../hooks/use-orgdiff-params';
 import type { AnalysisResult } from '../types';
+import { ConclusionView } from './conclusion/conclusion-view';
 import { EvidenceSheet } from './evidence-sheet/evidence-sheet';
 import { FindingsList } from './findings/findings-list';
 import { FunctionTable } from './function-table/function-table';
@@ -88,7 +89,5 @@ function ResultTabContent({ tab, result }: { tab: ResultTab; result: AnalysisRes
     return <FunctionTable result={result} unit={unit} onUnitChange={selectUnit} />;
   }
   if (tab === 'findings') return <FindingsList result={result} />;
-  return (
-    <ResultPlaceholder title='Экран в разработке' description='Появится в следующих задачах.' />
-  );
+  return <ConclusionView result={result} />;
 }
