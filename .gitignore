@@ -52,3 +52,6 @@ next-env.d.ts
 .env.local
 .env
 *.cleanup-backup
+
+# Тестовый ключ хакатона коммитим намеренно (см. .env)
+!.env
