@@ -5,6 +5,7 @@ import { demoDocs, startJob } from '@/features/orgdiff/lib/jobs';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const ACCEPTED = /\.(docx|pdf|xlsx|txt|md|png|jpe?g)$/i;
 
 /**
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
   for (const side of ['before', 'after'] as const) {
     for (const f of [...form.getAll(side), ...form.getAll(`${side}[]`)]) {
       if (typeof f === 'string') continue;
+      if (f.size > MAX_FILE_BYTES) {
+        return NextResponse.json({ error: `Файл «${f.name}» больше 20 МБ` }, { status: 413 });
+      }
       if (!ACCEPTED.test(f.name)) {
         return NextResponse.json({ error: `Неподдерживаемый формат: ${f.name}. Нужны .docx, .pdf, .xlsx, .txt или скан .png/.jpg` }, { status: 400 });
       }

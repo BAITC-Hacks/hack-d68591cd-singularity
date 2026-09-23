@@ -866,7 +866,9 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
       ).values()
     ];
 
-    for (const b of m.fn.holders) {
+    // Уникальные носители «до»: при слиянии двух подразделений в одно функция не засчитывается дважды.
+    const beforeHolders = [...new Map(m.fn.holders.map((h) => [h.key, h])).values()];
+    for (const b of beforeHolders) {
       for (const a of afterHolders) {
         const kind = a.key === b.key ? 'retained' : m.fn.holders.some((h) => h.key === a.key) ? null : 'transferred';
         if (!kind) continue;
@@ -876,6 +878,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
         }
         const id = `${b.key}→${a.key}`;
         const flow = flowMap.get(id) ?? { from: unitId(b.key), to: unitId(a.key), kind, functionCount: 0, evidence: [], matchIds: [] };
+        if (flow.matchIds!.includes(m.id!)) continue;
         flow.functionCount++;
         flow.matchIds!.push(m.id!);
         if (kind === 'transferred' && flow.evidence.length < 4) flow.evidence.push(ev(m.fn.clause), ev(m.after[0].clause));
