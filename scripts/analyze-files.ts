@@ -1,7 +1,7 @@
 /**
  * Прогон пайплайна на произвольных файлах без сервера — для проверки на своём комплекте.
  *   bun scripts/analyze-files.ts --before a.pdf [--before b.docx] --after c.pdf [--after d.xlsx] [--json out.json]
- * Форматы: .docx, .pdf (с текстовым слоем), .xlsx, .txt. Новые документы требуют OPENAI_API_KEY (.env).
+ * Форматы: .docx, .pdf (скан без текста — через OCR), .png/.jpg (OCR), .xlsx, .txt. Новые документы требуют OPENAI_API_KEY (.env).
  */
 import { readFile, writeFile } from 'fs/promises';
 import path from 'path';

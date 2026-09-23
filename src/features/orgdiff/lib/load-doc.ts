@@ -7,9 +7,11 @@ export interface TableSheet {
 }
 
 export const isTableFile = (filename: string) => /\.xlsx$/i.test(filename);
+/** Скан страницы картинкой — распознаётся OCR. */
+export const isImageFile = (filename: string) => /\.(png|jpe?g)$/i.test(filename);
 
 /**
- * Достаёт плоский текст из документа комплекта: Word, PDF, Excel или текст.
+ * Достаёт плоский текст из документа комплекта: Word, PDF (скан — через OCR), картинка (OCR), Excel или текст.
  * Нумерация пунктов в нормативных документах обычно набрана текстом,
  * поэтому достаточно «сырого» текста — структуру восстанавливает parse-clauses.
  */
@@ -26,8 +28,20 @@ export async function extractText(buf: Buffer, filename: string): Promise<string
     const pdf = await getDocumentProxy(new Uint8Array(buf));
     const { text } = await pdfText(pdf, { mergePages: false });
     const pages = Array.isArray(text) ? text : [text];
-    const joined = unwrapPdfLines(pages);
-    if (!joined.trim()) throw new Error(`В PDF «${filename}» нет текстового слоя (скан) — нужен PDF с текстом или .docx`);
+    // Скан: текстового слоя нет или он пустой (меньше 50 знаков на страницу) — распознаём OCR.
+    if (pages.join('').replace(/\s+/g, '').length < 50 * pages.length) {
+      const { ocrPdf } = await import('./ocr');
+      const joined = unwrapPdfLines(await ocrPdf(buf));
+      if (!joined.trim()) throw new Error(`В PDF «${filename}» нет текстового слоя, и OCR не нашёл текста — нужен PDF с текстом или .docx`);
+      return joined;
+    }
+    return unwrapPdfLines(pages);
+  }
+
+  if (isImageFile(lower)) {
+    const { ocrImage } = await import('./ocr');
+    const joined = unwrapPdfLines([await ocrImage(buf)]);
+    if (!joined.trim()) throw new Error(`На изображении «${filename}» OCR не нашёл текста`);
     return joined;
   }
 
