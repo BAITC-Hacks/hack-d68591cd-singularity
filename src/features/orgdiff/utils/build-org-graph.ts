@@ -59,32 +59,57 @@ export function buildOrgGraph(result: AnalysisResult): OrgGraph {
   return { nodes, edges };
 }
 
+export interface GraphFocus {
+  /** Выбранное подразделение: оно, его соседи по потокам, остальные приглушены */
+  selectedUnitId: string | null;
+  /** Подразделения из вывода («На схеме»): выделены все, активны потоки между ними */
+  highlightedUnitIds: string[];
+}
+
 /**
- * Подсветка: выбранное подразделение, его соседи по потокам, остальные приглушены.
- * Подписи «N ф.» — только у рёбер выбранного, иначе они наезжают друг на друга.
+ * Подсветка узлов и рёбер. Выбор подразделения важнее подсветки вывода.
+ * Подписи «N ф.» — только у активных рёбер, иначе они наезжают друг на друга.
  */
-export function applyFocus(graph: OrgGraph, selectedUnitId: string | null): OrgGraph {
-  if (!selectedUnitId) {
-    return { ...graph, edges: graph.edges.map((edge) => ({ ...edge, label: undefined })) };
-  }
+export function applyFocus(graph: OrgGraph, focus: GraphFocus): OrgGraph {
+  const { selectedUnitId, highlightedUnitIds } = focus;
+  if (selectedUnitId) return focusSelected(graph, selectedUnitId);
+  if (highlightedUnitIds.length > 0) return focusHighlighted(graph, new Set(highlightedUnitIds));
+  return { ...graph, edges: graph.edges.map((edge) => ({ ...edge, label: undefined })) };
+}
 
+function focusSelected(graph: OrgGraph, unitId: string): OrgGraph {
   const touches = (edge: FlowEdge) =>
-    edge.data?.flow.from === selectedUnitId || edge.data?.flow.to === selectedUnitId;
-  const relatedNodes = new Set(graph.edges.filter(touches).flatMap((e) => [e.source, e.target]));
+    edge.data?.flow.from === unitId || edge.data?.flow.to === unitId;
+  const related = new Set(
+    graph.edges.filter(touches).flatMap((edge) => [edge.source, edge.target])
+  );
+  return restyle(
+    graph,
+    (node) =>
+      node.data.unit.id === unitId ? 'selected' : related.has(node.id) ? 'related' : 'dimmed',
+    touches
+  );
+}
 
-  const nodes = graph.nodes.map((node): OrgNode => {
-    if (node.type !== 'unit') return node;
-    const focus: UnitNodeData['focus'] =
-      node.data.unit.id === selectedUnitId
-        ? 'selected'
-        : relatedNodes.has(node.id)
-          ? 'related'
-          : 'dimmed';
-    return { ...node, data: { ...node.data, focus } };
-  });
+function focusHighlighted(graph: OrgGraph, unitIds: Set<string>): OrgGraph {
+  return restyle(
+    graph,
+    (node) => (unitIds.has(node.data.unit.id) ? 'selected' : 'dimmed'),
+    (edge) => unitIds.has(edge.data?.flow.from ?? '') && unitIds.has(edge.data?.flow.to ?? '')
+  );
+}
 
+function restyle(
+  graph: OrgGraph,
+  nodeFocus: (node: UnitNode) => UnitNodeData['focus'],
+  edgeActive: (edge: FlowEdge) => boolean
+): OrgGraph {
+  const nodes = graph.nodes.map(
+    (node): OrgNode =>
+      node.type === 'unit' ? { ...node, data: { ...node.data, focus: nodeFocus(node) } } : node
+  );
   const edges = graph.edges.map((edge): FlowEdge => {
-    const active = touches(edge);
+    const active = edgeActive(edge);
     return {
       ...edge,
       animated: active && edge.data?.flow.kind === 'transferred',
@@ -92,7 +117,6 @@ export function applyFocus(graph: OrgGraph, selectedUnitId: string | null): OrgG
       style: { ...edge.style, opacity: active ? 1 : 0.15 }
     };
   });
-
   return { nodes, edges };
 }
 

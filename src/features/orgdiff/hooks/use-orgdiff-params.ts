@@ -8,12 +8,15 @@ export type OrgdiffTab = (typeof ORGDIFF_TABS)[number];
 
 /**
  * Состояние страницы в URL: вкладка, выбранное подразделение (UnitChange.id)
- * и открытый источник в панели справа (`finding:F4`, `match:m12`, `unit:…`, `flow:a>b`)
+ * открытый источник в панели справа (`finding:F4`, `match:m12`, `unit:…`, `flow:a>b`)
+ * и вывод, подсвеченный на схеме
  */
 export const orgdiffParsers = {
   tab: parseAsStringLiteral(ORGDIFF_TABS).withDefault('upload'),
   unit: parseAsString,
-  source: parseAsString
+  source: parseAsString,
+  /** Finding.id: подсветить на схеме затронутые подразделения */
+  finding: parseAsString
 };
 
 export function useOrgdiffParams() {

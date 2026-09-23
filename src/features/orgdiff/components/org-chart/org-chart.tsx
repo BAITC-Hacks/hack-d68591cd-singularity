@@ -11,6 +11,8 @@ import {
 } from '@xyflow/react';
 import { useTheme } from 'next-themes';
 import { useMemo } from 'react';
+import { Icons } from '@/components/icons';
+import { Button } from '@/components/ui/button';
 import type { AnalysisResult } from '../../types';
 import { useOpenSource } from '../../hooks/use-orgdiff-params';
 import {
@@ -29,14 +31,26 @@ const NODE_TYPES: NodeTypes = { unit: UnitNode, column: ColumnNode };
 interface OrgChartProps {
   result: AnalysisResult;
   selectedUnitId: string | null;
+  /** Finding.id, подразделения которого подсвечены («На схеме» в списке находок) */
+  highlightedFindingId: string | null;
   onSelectUnit: (unitId: string | null) => void;
+  onClearHighlight: () => void;
   onOpenFunctions: (unitId: string) => void;
 }
 
-export function OrgChart({ result, selectedUnitId, onSelectUnit, onOpenFunctions }: OrgChartProps) {
+export function OrgChart(props: OrgChartProps) {
+  const { result, selectedUnitId, highlightedFindingId, onSelectUnit, onOpenFunctions } = props;
   const { resolvedTheme } = useTheme();
+  const highlighted = result.findings.find((finding) => finding.id === highlightedFindingId);
   const graph = useMemo(() => buildOrgGraph(result), [result]);
-  const focused = useMemo(() => applyFocus(graph, selectedUnitId), [graph, selectedUnitId]);
+  const focused = useMemo(
+    () =>
+      applyFocus(graph, {
+        selectedUnitId,
+        highlightedUnitIds: highlighted?.unitIds ?? []
+      }),
+    [graph, selectedUnitId, highlighted]
+  );
   const selectedUnit = result.units.find((unit) => unit.id === selectedUnitId);
 
   const openSource = useOpenSource();
@@ -54,6 +68,28 @@ export function OrgChart({ result, selectedUnitId, onSelectUnit, onOpenFunctions
   return (
     <div className='flex flex-col gap-3'>
       <ChartLegend />
+      {highlighted ? (
+        <div className='border-primary/40 bg-primary/5 flex items-center gap-3 rounded-lg border px-3 py-2 text-sm'>
+          <span className='min-w-0 flex-1'>
+            <span className='text-muted-foreground'>Подсвечено по выводу {highlighted.id}: </span>
+            <button
+              type='button'
+              className='font-medium underline-offset-2 hover:underline'
+              onClick={() => openSource({ kind: 'finding', id: highlighted.id })}
+            >
+              {highlighted.title}
+            </button>
+          </span>
+          <Button
+            variant='ghost'
+            size='icon-sm'
+            onClick={props.onClearHighlight}
+            aria-label='Снять подсветку'
+          >
+            <Icons.close />
+          </Button>
+        </div>
+      ) : null}
       <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]'>
         <div className='bg-card h-[640px] overflow-hidden rounded-lg border'>
           <ReactFlow<OrgNode, FlowEdge>
