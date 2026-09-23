@@ -12,6 +12,10 @@ export interface SourceDoc {
   /** Имя исходного файла — показывается пользователю вместе с пунктом */
   name: string;
   clauseCount: number;
+  /** «Положение о внутреннем аудите АО «Компания», ред. 9 от 23 декабря 2022 года» — если удалось извлечь из шапки */
+  title?: string;
+  /** «ред. 9» */
+  short?: string;
 }
 
 /**
@@ -61,6 +65,8 @@ export interface UnitChange {
   /** Должности в подчинении — для узла схемы */
   positions: { before: string[]; after: string[] };
   evidence: Evidence[];
+  /** UnitChange.id руководителя по каждой стороне (подчинённость для схемы); нет — верхний уровень */
+  parentId?: { before?: string; after?: string };
 }
 
 /** Ребро схемы «до → после»: куда ушли функции подразделения. */
@@ -73,6 +79,8 @@ export interface UnitFlow {
   kind: 'retained' | 'transferred';
   functionCount: number;
   evidence: Evidence[];
+  /** FunctionMatch.id всех функций, давших это ребро (functionCount === matchIds.length) */
+  matchIds?: string[];
 }
 
 /** Атомарная функция подразделения (must have 2 и 3). */
@@ -157,6 +165,21 @@ export interface Finding {
   /** Уверенность 0..1 */
   confidence: number;
   recommendation?: string;
+  /** Источники парами «до ↔ после» для панели сравнения; evidence остаётся полным плоским списком */
+  pairs?: EvidencePair[];
+  /** FunctionMatch.id строк таблицы сопоставления, на которых основан вывод */
+  matchIds?: string[];
+  /** Оговорка: что требует проверки сотрудником */
+  caveat?: string;
+}
+
+export interface EvidencePair {
+  /** нет — пункт появился только в «после» */
+  before?: Evidence;
+  /** нет — пункт исчез (потеря) */
+  after?: Evidence;
+  /** «убрано: «ежеквартально»», носитель и т.п. */
+  note?: string;
 }
 
 /** Итоговое заключение (must have 5). */
@@ -172,8 +195,10 @@ export interface Conclusion {
 export interface TraceStep {
   id: string;
   label: string;
-  status: 'running' | 'done' | 'error' | 'skipped';
+  /** pending — шаг ещё не начат: весь план шагов виден сразу после запуска */
+  status: 'pending' | 'running' | 'done' | 'error' | 'skipped';
   detail?: string;
+  /** 0 — шаг ещё не начат (pending) */
   startedAt: number;
   finishedAt?: number;
 }

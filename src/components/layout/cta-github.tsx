@@ -12,7 +12,7 @@ export default function CtaGithub() {
       render={
         <a
           aria-label='View on GitHub'
-          href='https://github.com/Kiranism/next-shadcn-dashboard-starter'
+          href='https://github.com/BAITC-Hacks/hack-d68591cd-singularity'
           rel='noopener noreferrer'
           target='_blank'
           className='text-muted-foreground hover:text-foreground transition-colors duration-300'
