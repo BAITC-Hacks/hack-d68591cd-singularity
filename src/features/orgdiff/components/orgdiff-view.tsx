@@ -5,6 +5,7 @@ import { useAnalysisResult } from '../api/queries';
 import { useOrgdiffParams, type OrgdiffTab } from '../hooks/use-orgdiff-params';
 import type { AnalysisResult } from '../types';
 import { EvidenceSheet } from './evidence-sheet/evidence-sheet';
+import { FindingsList } from './findings/findings-list';
 import { FunctionTable } from './function-table/function-table';
 import { OrgChart } from './org-chart/org-chart';
 import { ResultPlaceholder } from './result-placeholder';
@@ -20,7 +21,7 @@ const RESULT_TABS: { id: ResultTab; label: string }[] = [
 ];
 
 export function OrgdiffView() {
-  const [{ tab, unit, source }, setParams] = useOrgdiffParams();
+  const [{ tab, source }, setParams] = useOrgdiffParams();
   const result = useAnalysisResult();
 
   return (
@@ -43,19 +44,15 @@ export function OrgdiffView() {
         </TabsList>
 
         <TabsContent value='upload' keepMounted className='pt-2'>
-          <UploadPanel onShowResults={() => void setParams({ tab: 'chart', unit: null })} />
+          <UploadPanel
+            onShowResults={() => void setParams({ tab: 'findings', unit: null, finding: null })}
+          />
         </TabsContent>
 
         {RESULT_TABS.map(({ id }) => (
           <TabsContent key={id} value={id} className='pt-2'>
             {result ? (
-              <ResultTabContent
-                tab={id}
-                result={result}
-                selectedUnitId={unit}
-                onSelectUnit={(unitId) => void setParams({ unit: unitId })}
-                onOpenFunctions={(unitId) => void setParams({ tab: 'functions', unit: unitId })}
-              />
+              <ResultTabContent tab={id} result={result} />
             ) : (
               <ResultPlaceholder
                 title='Анализ ещё не запускался'
@@ -71,25 +68,26 @@ export function OrgdiffView() {
   );
 }
 
-interface ResultTabContentProps {
-  tab: ResultTab;
-  result: AnalysisResult;
-  selectedUnitId: string | null;
-  onSelectUnit: (unitId: string | null) => void;
-  onOpenFunctions: (unitId: string) => void;
-}
+function ResultTabContent({ tab, result }: { tab: ResultTab; result: AnalysisResult }) {
+  const [{ unit, finding }, setParams] = useOrgdiffParams();
+  const selectUnit = (unitId: string | null) => void setParams({ unit: unitId, finding: null });
 
-function ResultTabContent({ tab, result, ...chartProps }: ResultTabContentProps) {
-  if (tab === 'chart') return <OrgChart result={result} {...chartProps} />;
-  if (tab === 'functions') {
+  if (tab === 'chart') {
     return (
-      <FunctionTable
+      <OrgChart
         result={result}
-        unit={chartProps.selectedUnitId}
-        onUnitChange={chartProps.onSelectUnit}
+        selectedUnitId={unit}
+        highlightedFindingId={finding}
+        onSelectUnit={selectUnit}
+        onClearHighlight={() => void setParams({ finding: null })}
+        onOpenFunctions={(unitId) => void setParams({ tab: 'functions', unit: unitId })}
       />
     );
   }
+  if (tab === 'functions') {
+    return <FunctionTable result={result} unit={unit} onUnitChange={selectUnit} />;
+  }
+  if (tab === 'findings') return <FindingsList result={result} />;
   return (
     <ResultPlaceholder title='Экран в разработке' description='Появится в следующих задачах.' />
   );
