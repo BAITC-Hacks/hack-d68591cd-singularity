@@ -3,7 +3,6 @@
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
 import {
   FINDING_KIND_LABELS,
   type AnalysisResult,
@@ -11,8 +10,9 @@ import {
   type UnitChange
 } from '../../types';
 import { useOpenSource } from '../../hooks/use-orgdiff-params';
-import { UNIT_STATUS_META, unitLabel } from '../../utils/unit-status';
+import { unitLabel } from '../../utils/unit-status';
 import { EvidenceChips } from '../evidence-chip';
+import { UnitStatusChip } from '../unit-status-chip';
 
 const SEVERITY_LABELS: Record<Severity, string> = {
   high: 'высокая',
@@ -28,7 +28,6 @@ interface UnitDetailsProps {
 }
 
 export function UnitDetails({ unit, result, onClose, onOpenFunctions }: UnitDetailsProps) {
-  const meta = UNIT_STATUS_META[unit.status];
   const openSource = useOpenSource();
   const nameOf = (id: string) => {
     const found = result.units.find((item) => item.id === id);
@@ -46,9 +45,7 @@ export function UnitDetails({ unit, result, onClose, onOpenFunctions }: UnitDeta
           <div className='min-w-0'>
             <CardTitle className='flex flex-wrap items-center gap-2'>
               {unitLabel(unit)}
-              <span className={cn('rounded px-1.5 py-0.5 text-xs font-medium', meta.badgeClass)}>
-                {meta.label}
-              </span>
+              <UnitStatusChip status={unit.status} />
             </CardTitle>
             {unit.abbr ? <CardDescription>{unit.name}</CardDescription> : null}
           </div>
