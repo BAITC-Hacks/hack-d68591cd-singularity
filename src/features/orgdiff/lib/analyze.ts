@@ -856,9 +856,14 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     // Утраченная функция никуда не передана: частичное покрытие — не поток.
     if (!m.after.length || m.status === 'lost') continue;
     // Передача X → Y засчитывается, только если у Y этой функции прежде не было: иначе у X снят дубль.
+    // Уникальные носители: один носитель в нескольких пунктах «после» — одна функция, а не несколько.
     const afterHolders = [
-      ...new Map(m.after.flatMap((a) => a.holders.filter((h) => !hadBefore(a, h.key))).map((h) => [h.key, h])).values(),
-      ...m.after.flatMap((a) => a.holders).filter((h) => m.fn!.holders.some((x) => x.key === h.key))
+      ...new Map(
+        [
+          ...m.after.flatMap((a) => a.holders.filter((h) => !hadBefore(a, h.key))),
+          ...m.after.flatMap((a) => a.holders).filter((h) => m.fn!.holders.some((x) => x.key === h.key))
+        ].map((h) => [h.key, h])
+      ).values()
     ];
 
     for (const b of m.fn.holders) {

@@ -39,11 +39,11 @@ function structureFromTable(clauses: ParsedClause[]): UnitDef[] {
   for (const r of rows) {
     const name = unitOf(r)?.trim();
     if (!name) continue;
-    const abbr = abbrOf(r)?.match(/^[А-ЯЁA-Z]{2,12}$/u)?.[0] ?? name.match(/\(([А-ЯЁA-Z]{2,12})\)/u)?.[1];
+    const abbr = abbrOf(r)?.match(/^(?=[А-ЯЁA-Z](?:[а-яёa-z]*[А-ЯЁA-Z]))[А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z]{1,11}$/u)?.[0] ?? name.match(/\(((?=[А-ЯЁA-Z](?:[а-яёa-z]*[А-ЯЁA-Z]))[А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z]{1,11})\)/u)?.[1];
     const key = unitKey(name.replace(/\s*\([^)]*\)\s*$/u, ''), abbr);
     let u = out.get(key);
     if (!u) {
-      u = { key, name: name.replace(/\s*\([А-ЯЁA-Z]{2,12}\)\s*$/u, ''), abbr, kind: 'unit', side: r.side, docName: r.docName, clauseId: r.id, quote: r.text, positions: [], positionsClauseId: r.id };
+      u = { key, name: name.replace(/\s*\((?=[А-ЯЁA-Z](?:[а-яёa-z]*[А-ЯЁA-Z]))[А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z]{1,11}\)\s*$/u, ''), abbr, kind: 'unit', side: r.side, docName: r.docName, clauseId: r.id, quote: r.text, positions: [], positionsClauseId: r.id };
       out.set(key, u);
     }
     for (const p of [headOf(r), ...(posOf(r)?.split(/[;\n]|,\s*(?=[А-ЯЁ])/u) ?? [])]) {
@@ -64,7 +64,7 @@ function structureFromInlineList(clauses: ParsedClause[]): UnitDef[] {
     for (const raw of tail.split(/[,;]|\s+и\s+(?=\p{Lu})|\.\s|\.$/u)) {
       const item = raw.trim().replace(/[.;]$/, '');
       if (!UNIT_WORD.test(item) || item.length > 140) continue;
-      const am = item.match(/^(.+?)\s*\(([А-ЯЁA-Z]{2,12})\)$/u);
+      const am = item.match(/^(.+?)\s*\(((?=[А-ЯЁA-Z](?:[а-яёa-z]*[А-ЯЁA-Z]))[А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z]{1,11})\)$/u);
       const name = am ? am[1] : item;
       if (out.some((u) => u.key === unitKey(name, am?.[2]))) continue;
       out.push({
@@ -86,7 +86,7 @@ function structureFromInlineList(clauses: ParsedClause[]): UnitDef[] {
 
 /** "Департамент операционного аудита (ДОА)." → имя + аббревиатура. */
 const UNIT_RE =
-  /^((?:Департамент|Управление|Отдел|Служба|Дирекция|Блок|Центр|Сектор|Группа)\s+[^.(]{3,120}?)\s*(?:\(([А-ЯЁA-Z]{2,12})\))?\s*[.;]?$/u;
+  /^((?:Департамент|Управление|Отдел|Служба|Дирекция|Блок|Центр|Сектор|Группа)\s+[^.(]{3,120}?)\s*(?:\(((?=[А-ЯЁA-Z](?:[а-яёa-z]*[А-ЯЁA-Z]))[А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z]{1,11})\))?\s*[.;]?$/u;
 /** "Директору ДНМ подчиняются работники …" / "Главному аудитору подчиняются …" */
 const SUBORD_RE = /^(.{3,120}?)\s+подчиня(?:ю|е)тся/iu;
 
@@ -287,7 +287,7 @@ function isSelfReference(text: string, owner: UnitDef, units: UnitDef[]): boolea
  * пункт без явного носителя принадлежит этому подразделению, а не блоку в целом.
  */
 export function holdersOf(c: ParsedClause, byId: Map<string, ParsedClause>, units: UnitDef[], owner?: UnitDef): UnitDef[] {
-  const tag = c.text.match(/\(([А-ЯЁA-Z]{2,12})\)\s*[.;]?\s*$/u);
+  const tag = c.text.match(/\(((?=[А-ЯЁA-Z](?:[а-яёa-z]*[А-ЯЁA-Z]))[А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z]{1,11})\)\s*[.;]?\s*$/u);
   if (tag) {
     const u = units.find((x) => x.abbr === tag[1]);
     if (u) return [u];
