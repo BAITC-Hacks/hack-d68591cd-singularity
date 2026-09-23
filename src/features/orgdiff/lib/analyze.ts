@@ -134,7 +134,13 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
           meta.set(`${d.side}:${d.name}`, {});
           continue;
         }
-        const text = await extractText(d.buffer, d.name);
+        let text: string;
+        try {
+          text = await extractText(d.buffer, d.name);
+        } catch (e) {
+          const reason = e instanceof Error && /[а-яё]/i.test(e.message) ? e.message : 'файл повреждён или формат не соответствует расширению';
+          throw new Error(`Не удалось прочитать файл «${d.name}»: ${reason}. Проверьте файл (поддерживаются .docx, .pdf, .xlsx, .png/.jpg, .txt).`);
+        }
         meta.set(`${d.side}:${d.name}`, docMeta(text));
         heads.set(`${d.side}:${d.name}`, docHead(text));
         out[d.side].push(...parseClauses(text, d.side, d.name));
@@ -525,12 +531,28 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
             `${f.id} [${f.origin === 'preexisting' ? 'было ранее' : 'новое'}; ${f.kind}, ${f.severity}] ${f.title}. ${clip(f.detail, 700)}${f.recommendation ? ` Рекомендация вывода: ${clip(f.recommendation, 300)}` : ''} Источники: ${f.evidence.map((e) => `${e.side === 'before' ? 'до' : 'после'}${docTag(e.side, e.docName)} п. ${e.clauseId}`).join(', ')}`
         )
         .join('\n');
-      const d = assembled.findings.length
+      // Новых изменений нет (документы совпадают по существу) — заключение собирается детерминированно, без модели.
+      const old = assembled.findings.filter((f) => f.origin === 'preexisting');
+      const hasNew = assembled.findings.some((f) => f.origin !== 'preexisting');
+      const noChange = `Изменений в новой редакции не выявлено: состав подразделений совпадает, ${exact.size} из ${fns.before.length} функций совпадают дословно, остальные сопоставлены по смыслу без потерь.`;
+      const d = hasNew
         ? await writeConclusion(digest)
         : {
-            summary: `Изменений не выявлено: состав подразделений совпадает, ${exact.size} из ${fns.before.length} функций совпадают дословно, остальные сопоставлены по смыслу без потерь, дублирования и конфликтов интересов.`,
-            sections: [],
-            recommendations: []
+            summary: old.length
+              ? `${noChange} Отмечены ${old.length} замечаний к структуре в целом — они существовали и в прежней редакции.`
+              : `${noChange} Дублирования и конфликтов интересов не найдено.`,
+            sections: old.length
+              ? [
+                  {
+                    title: 'Замечания к структуре в целом (были и в прежней редакции)',
+                    text: old.map((f) => `${f.id}. ${f.title}`).join('\n'),
+                    findingIds: old.map((f) => f.id)
+                  }
+                ]
+              : [],
+            recommendations: [...new Map(old.filter((f) => f.recommendation).map((f) => [f.recommendation!, f.id])).entries()]
+              .slice(0, 5)
+              .map(([text, id]) => ({ text, findingIds: [id] }))
           };
       const ids = new Set(assembled.findings.map((f) => f.id));
       return {
