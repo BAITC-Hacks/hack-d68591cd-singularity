@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import type {
   AnalysisResult,
+  ComplianceItem,
   DocSide,
   Evidence,
   EvidencePair,
@@ -24,6 +25,7 @@ import {
   type MatchVerdict
 } from './judge';
 import { embed, llmStats, MODEL } from './llm';
+import { checkCompliance } from './compliance';
 import { findRefDefects } from './defects';
 import { extractTables, extractText, isTableFile } from './load-doc';
 import { parseClauses, parseTable, toPublicClause, type ParsedClause } from './parse-clauses';
@@ -58,7 +60,8 @@ export const PIPELINE_STEPS = [
   { id: 'conflicts', label: 'Поиск конфликта интересов (каталог правил IIA/SoD)' },
   { id: 'redistribute', label: 'Рекомендации по перераспределению утраченных функций' },
   { id: 'assemble', label: 'Проверка цитат и сборка выводов' },
-  { id: 'conclusion', label: 'Итоговое аналитическое заключение' }
+  { id: 'conclusion', label: 'Итоговое аналитическое заключение' },
+  { id: 'compliance', label: 'Сверка с внешними требованиями (IIA, Закон РК «Об АО»)' }
 ] as const;
 
 export const pendingTrace = (): TraceStep[] =>
@@ -433,6 +436,22 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     }
   );
 
+  // 13. Опция 1 ТЗ: сверка новой редакции с внешними требованиями. Ошибка шага не валит анализ.
+  let compliance: ComplianceItem[] = [];
+  try {
+    compliance = await step(
+      'compliance',
+      'Сверка с внешними требованиями (IIA, Закон РК «Об АО»)',
+      () => checkCompliance(parsed.after),
+      (r) => {
+        const n = (st: ComplianceItem['status']) => r.filter((x) => x.status === st).length;
+        return `требований: ${r.length}; выполнено ${n('met')}, частично ${n('partial')}, не выполнено ${n('not_met')}, противоречит ${n('contradicts')}, не найдено ${n('no_evidence')}`;
+      }
+    );
+  } catch {
+    // статус 'error' и текст ошибки уже записаны в trace шагом step()
+  }
+
   const units = assembled.units;
   return {
     documents: docs.map((d) => ({
@@ -448,6 +467,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     matches: assembled.matches,
     findings: assembled.findings,
     conclusion,
+    compliance,
     trace,
     stats: {
       clausesBefore: parsed.before.length,
