@@ -2,6 +2,7 @@ import type {
   AnalysisResult,
   DocSide,
   Evidence,
+  EvidencePair,
   Finding,
   FunctionMatch,
   MatchStatus,
@@ -41,15 +42,51 @@ const DISCLAIMER =
 const DUP_THRESHOLD = 0.72;
 const MAX_DUP_PAIRS = 60;
 
+/** План шагов агента: интерфейс показывает его целиком сразу после запуска. */
+export const PIPELINE_STEPS = [
+  { id: 'parse', label: 'Чтение документов и разбор на пункты' },
+  { id: 'structure', label: 'Определение состава подразделений' },
+  { id: 'functions', label: 'Извлечение функций и их носителей' },
+  { id: 'align', label: 'Выравнивание неизменённых пунктов' },
+  { id: 'embed', label: 'Семантические векторы пунктов' },
+  { id: 'match', label: 'ИИ-сопоставление изменённых функций' },
+  { id: 'recheck', label: 'Самопроверка потерь по всему документу' },
+  { id: 'duplicates', label: 'Поиск дублирования и пересечения функций' },
+  { id: 'conflicts', label: 'Поиск конфликта интересов (каталог правил IIA/SoD)' },
+  { id: 'assemble', label: 'Проверка цитат и сборка выводов' },
+  { id: 'conclusion', label: 'Итоговое аналитическое заключение' }
+] as const;
+
+export const pendingTrace = (): TraceStep[] =>
+  PIPELINE_STEPS.map((s) => ({ ...s, status: 'pending', startedAt: 0 }));
+
+/** Шапка документа: «ПОЛОЖЕНИЕ О … (редакция No9) от «23» декабря 2022» → название и «ред. 9». */
+export function docMeta(text: string): { title?: string; short?: string } {
+  const head = text.slice(0, 2000);
+  const lines = head.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const red = head.match(/редакци[яи]\s*(?:No|№)?\s*(\d+)/iu);
+  const date = head.match(/от\s*«(\d{1,2})»\s*(\p{L}+)\s*(\d{4})/u);
+  const i = lines.findIndex((l) => /^(ПОЛОЖЕНИЕ|ПОЛИТИКА|РЕГЛАМЕНТ|ИНСТРУКЦИЯ|ПРИКАЗ|СТРУКТУРА|ДОЛЖНОСТНАЯ)/u.test(l));
+  const short = red ? `ред. ${red[1]}` : undefined;
+  if (i < 0) return { short };
+  const raw = [lines[i], lines[i + 1] ?? ''].join(' ').replace(/\(редакция[^)]*\)/iu, '').trim();
+  const words = raw.split(/\s+/).map((w, k) => (w.length >= 4 && w === w.toUpperCase() ? w.toLowerCase() : k > 0 && w.length === 1 ? w.toLowerCase() : w));
+  const title = words.join(' ').replace(/^\p{L}/u, (c) => c.toUpperCase());
+  return { title: `${title}${short ? `, ${short}` : ''}${date ? ` от ${date[1]} ${date[2]} ${date[3]} г.` : ''}`, short };
+}
+
 export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promise<AnalysisResult> {
   const t0 = Date.now();
   const callsBefore = llmStats.calls;
   const hitsBefore = llmStats.cacheHits;
-  const trace: TraceStep[] = [];
+  const trace = pendingTrace();
+  const meta = new Map<string, { title?: string; short?: string }>();
 
   const step = async <T>(id: string, label: string, fn: () => Promise<T>, detail?: (r: T) => string): Promise<T> => {
-    const s: TraceStep = { id, label, status: 'running', startedAt: Date.now() };
-    trace.push(s);
+    let s = trace.find((x) => x.id === id);
+    if (!s) trace.push((s = { id, label, status: 'pending', startedAt: 0 }));
+    s.status = 'running';
+    s.startedAt = Date.now();
     onProgress?.([...trace]);
     try {
       const r = await fn();
@@ -75,6 +112,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
       const out: Record<DocSide, ParsedClause[]> = { before: [], after: [] };
       for (const d of docs) {
         const text = await extractText(d.buffer, d.name);
+        meta.set(`${d.side}:${d.name}`, docMeta(text));
         out[d.side].push(...parseClauses(text, d.side, d.name));
       }
       return out;
@@ -244,6 +282,8 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
           const b = unitFns[j];
           const shared = a.holders.some((h) => b.holders.some((g) => g.key === h.key));
           if (shared) continue;
+          // Подпункты одного перечня («5.3.2.а … (ДИТААД)», «5.3.2.б … (ДОА)») — это само разделение предметов, а не пересечение.
+          if (a.clause.parentId && a.clause.parentId === b.clause.parentId && a.clause.docName === b.clause.docName) continue;
           const va = vectors.get(a.uid);
           const vb = vectors.get(b.uid);
           if (!va || !vb) continue;
@@ -269,7 +309,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     'Поиск конфликта интересов (каталог правил IIA/SoD)',
     () =>
       findConflicts(
-        fns.after.filter((f) => ['2', '4', '5', '6'].includes(f.clause.section)),
+        fns.after.filter((f) => /цел|задач|функци|прав|обязанност|взаимоотношени|дзо|дочерн/iu.test(f.clause.sectionTitle)),
         afterAll.filter((f) => /конфликт|КИ\b|независим|совмещ|объективн/iu.test(f.clause.text))
       ),
     (r) => `кандидатов: ${r.length}`
@@ -280,7 +320,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     'assemble',
     'Проверка цитат и сборка выводов',
     async () => assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef }),
-    (r) => `выводов: ${r.findings.length}, отброшено без подтверждения: ${r.dropped}`
+    (r) => `выводов: ${r.findings.length}; отброшено без подтверждённой цитаты: выводов ${r.dropped}, цитат ${r.unverified}`
   );
 
   // 12. Итоговое заключение
@@ -307,7 +347,8 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     documents: docs.map((d) => ({
       side: d.side,
       name: d.name,
-      clauseCount: parsed[d.side].filter((c) => c.docName === d.name).length
+      clauseCount: parsed[d.side].filter((c) => c.docName === d.name).length,
+      ...meta.get(`${d.side}:${d.name}`)
     })),
     clauses: [...parsed.before, ...parsed.after].map(toPublicClause),
     units,
@@ -339,6 +380,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
 // ---------------------------------------------------------------------------------------------
 
 interface MatchRow {
+  id?: string;
   fn?: Fn;
   after: Fn[];
   status: MatchStatus;
@@ -432,8 +474,9 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     quote: quoteOf(f.clause.text)
   }));
 
-  const matches: FunctionMatch[] = matchRows.map((m, i) => ({
-    id: `m${i + 1}`,
+  matchRows.forEach((m, i) => (m.id = `m${i + 1}`));
+  const matches: FunctionMatch[] = matchRows.map((m) => ({
+    id: m.id!,
     status: m.status,
     beforeId: m.fn?.uid,
     afterIds: m.after.map((a) => a.uid),
@@ -443,6 +486,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
 
   // --- потоки функций между подразделениями
   const flowMap = new Map<string, UnitFlow>();
+  const flowPairs = new Map<string, EvidencePair[]>();
   const touched = new Map<string, { in: number; out: number; lost: number; narrowed: number }>();
   const bump = (key: string, k: 'in' | 'out' | 'lost' | 'narrowed') => {
     const t = touched.get(key) ?? { in: 0, out: 0, lost: 0, narrowed: 0 };
@@ -464,9 +508,15 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
           bump(a.key, 'in');
         }
         const id = `${b.key}→${a.key}`;
-        const flow = flowMap.get(id) ?? { from: unitId(b.key), to: unitId(a.key), kind, functionCount: 0, evidence: [] };
+        const flow = flowMap.get(id) ?? { from: unitId(b.key), to: unitId(a.key), kind, functionCount: 0, evidence: [], matchIds: [] };
         flow.functionCount++;
+        flow.matchIds!.push(m.id!);
         if (kind === 'transferred' && flow.evidence.length < 4) flow.evidence.push(ev(m.fn.clause), ev(m.after[0].clause));
+        if (kind === 'transferred') {
+          const fp = flowPairs.get(id) ?? [];
+          if (fp.length < 8) fp.push({ before: ev(m.fn.clause), after: ev(m.after[0].clause), note: `${holderLabel(m.fn)} → ${holderLabel(m.after[0])}` });
+          flowPairs.set(id, fp);
+        }
         flowMap.set(id, flow);
       }
     }
@@ -475,6 +525,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
 
   // --- подразделения
   const keys = [...new Set([...structure.before, ...structure.after].map((u) => u.key))];
+  const unitPairs = new Map<string, EvidencePair[]>();
   const units: UnitChange[] = keys.map((key) => {
     const b = structure.before.find((u) => u.key === key);
     const a = structure.after.find((u) => u.key === key);
@@ -504,16 +555,24 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     if (t.lost) parts.push(`утрачено функций: ${t.lost}`);
 
     const evidence: Evidence[] = [];
+    const nameEv: Partial<Record<DocSide, Evidence>> = {};
+    const posEv: Partial<Record<DocSide, Evidence>> = {};
     for (const x of [b, a]) {
       if (!x) continue;
       const c = clauseOf(x.side, docOf(parsed, x), x.clauseId);
-      if (c) evidence.push(ev(c, x.quote));
+      if (c) evidence.push((nameEv[x.side] = ev(c, x.quote)));
       if (x.positionsClauseId) {
         const pc = clauseOf(x.side, docOf(parsed, x), x.positionsClauseId);
-        if (pc) evidence.push(ev(pc));
+        if (pc) evidence.push((posEv[x.side] = ev(pc)));
       }
     }
+    const pairs: EvidencePair[] = [{ before: nameEv.before, after: nameEv.after, note: 'наименование в структуре' }];
+    if (posEv.before || posEv.after) pairs.push({ before: posEv.before, after: posEv.after, note: 'состав должностей' });
+    unitPairs.set(unitId(key), pairs);
+    const parentB = b && parentUnit(b, structure.before);
+    const parentA = a && parentUnit(a, structure.after);
     return {
+      parentId: parentB || parentA ? { before: parentB && unitId(parentB.key), after: parentA && unitId(parentA.key) } : undefined,
       id: unitId(key),
       name: u.name,
       abbr: u.abbr,
@@ -538,10 +597,9 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
         : kind === 'unit_removed'
           ? `${pos ? 'Упразднена должность' : 'Упразднено подразделение'}: ${u.name}`
           : `Признаки реорганизации: ${u.name}${u.abbr ? ` (${u.abbr})` : ''}`;
-    const flowEv = flows
-      .filter((f) => f.kind === 'transferred' && (f.from === u.id || f.to === u.id))
-      .flatMap((f) => f.evidence)
-      .slice(0, 4);
+    const unitFlows = flows.filter((f) => f.kind === 'transferred' && (f.from === u.id || f.to === u.id));
+    const flowEv = unitFlows.flatMap((f) => f.evidence).slice(0, 4);
+    const pairsOfFlows = unitFlows.flatMap((f) => (flowPairs.get(flowKey(f)) ?? []).slice(0, 2)).slice(0, 6);
     raw.push({
       kind,
       severity: kind === 'unit_removed' && lostByUnit.get(u.id) ? 'high' : 'medium',
@@ -549,6 +607,8 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
       detail: `${u.summary}.${u.positions.before.length || u.positions.after.length ? ` Должности до: ${u.positions.before.join(', ') || '—'}; после: ${u.positions.after.join(', ') || '—'}.` : ''}`,
       unitIds: [u.id],
       evidence: [...u.evidence, ...flowEv],
+      pairs: [...(unitPairs.get(u.id) ?? []), ...pairsOfFlows],
+      matchIds: unitFlows.flatMap((f) => f.matchIds ?? []),
       confidence: 0.9
     });
   }
@@ -572,6 +632,8 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
       detail: `Функции «${r.name}» перешли во вновь созданные подразделения: ${names.join(', ')} из ${total} переданных функций.`,
       unitIds: [r.id, ...toCreated.map((f) => f.to)],
       evidence: [...r.evidence.slice(0, 1), ...toCreated.flatMap((f) => f.evidence.slice(0, 2))],
+      pairs: toCreated.flatMap((f) => (flowPairs.get(flowKey(f)) ?? []).slice(0, 3)),
+      matchIds: toCreated.flatMap((f) => f.matchIds ?? []),
       confidence: 0.85
     });
   }
@@ -590,6 +652,14 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
           : `В новой редакции не найден пункт, покрывающий функцию п. ${m.fn.clause.id} прежней редакции. ${m.explanation}`,
         unitIds: holders,
         evidence: [ev(m.fn.clause), ...m.after.slice(0, 2).map((a) => ev(a.clause))],
+        pairs: [
+          {
+            before: ev(m.fn.clause),
+            after: m.after[0] ? ev(m.after[0].clause) : undefined,
+            note: m.partialLoss ? 'в новой редакции — лишь частичное покрытие общими нормами' : 'соответствия в новой редакции не найдено'
+          }
+        ],
+        matchIds: [m.id!],
         confidence: m.confidence,
         recommendation: 'Проверить, должна ли функция сохраниться, и при необходимости закрепить её за профильным подразделением.'
       });
@@ -602,6 +672,8 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
         detail: `${m.explanation}${m.lostPart ? ` Утраченная часть: «${m.lostPart}».` : ''}`,
         unitIds: [...new Set([...holders, ...m.after.flatMap((a) => a.holders.map((h) => unitId(h.key)))])],
         evidence: [ev(m.fn.clause, m.lostPart && quoteInText(m.lostPart, m.fn.clause.text) ? m.lostPart : undefined), ...m.after.slice(0, 2).map((a) => ev(a.clause))],
+        pairs: [{ before: ev(m.fn.clause), after: m.after[0] && ev(m.after[0].clause), note: m.lostPart ? `убрано: «${m.lostPart}»` : undefined }],
+        matchIds: [m.id!],
         confidence: m.confidence
       });
     }
@@ -616,6 +688,14 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
       detail: v.explanation,
       unitIds: [...new Set([...p.a.holders, ...p.b.holders].map((h) => unitId(h.key)))],
       evidence: [ev(p.a.clause), ev(p.b.clause)],
+      pairs: [
+        { after: ev(p.a.clause), note: holderLabel(p.a) },
+        { after: ev(p.b.clause), note: holderLabel(p.b) }
+      ],
+      caveat:
+        p.a.holders.length > 1 || p.b.holders.length > 1
+          ? 'Пункт закреплён сразу за несколькими носителями — распределение обязанностей между ними требует уточнения.'
+          : undefined,
       confidence: v.confidence,
       recommendation: v.recommendation || undefined
     });
@@ -638,6 +718,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
       detail: `${c.detail} (правило ${c.rule})`,
       unitIds: holderIds,
       evidence,
+      pairs: evidence.map((e) => ({ after: e })),
       confidence: c.confidence,
       recommendation: c.recommendation || undefined
     });
@@ -651,15 +732,34 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     });
   }
 
-  // Ограничение 9 ТЗ: вывод без подтверждённой цитаты не показывается.
-  const kept = raw.filter((f) => f.evidence.length > 0 && f.evidence.some((e) => e.verified));
+  // Ограничение 9 ТЗ: неподтверждённые цитаты убираются, вывод без подтверждённых цитат не показывается.
+  const unverified = raw.reduce((n, f) => n + f.evidence.filter((e) => !e.verified).length, 0);
+  for (const f of raw) {
+    f.evidence = f.evidence.filter((e) => e.verified);
+    f.pairs = f.pairs
+      ?.map((p) => ({ ...p, before: p.before?.verified ? p.before : undefined, after: p.after?.verified ? p.after : undefined }))
+      .filter((p) => p.before || p.after);
+  }
+  const kept = raw.filter((f) => f.evidence.length > 0);
   const order = { high: 0, medium: 1, low: 2 } as const;
   const kindOrder = ['unit_removed', 'unit_created', 'unit_reorganized', 'function_lost', 'function_narrowed', 'function_duplicated', 'responsibility_overlap', 'conflict_of_interest'];
   const findings: Finding[] = kept
     .sort((a, b) => kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) || order[a.severity] - order[b.severity])
     .map((f, i) => ({ ...f, id: `F${i + 1}` }));
 
-  return { units, flows, functions, matches, findings, dropped: raw.length - kept.length };
+  return { units, flows, functions, matches, findings, dropped: raw.length - kept.length, unverified };
+}
+
+const flowKey = (f: UnitFlow) => `${f.from.replace(/^u-/, '')}→${f.to.replace(/^u-/, '')}`;
+
+/** Руководитель подразделения/должности: владелец перечня, где есть «Директор <аббревиатура>» или сама должность. */
+function parentUnit(u: UnitDef, all: UnitDef[]): UnitDef | undefined {
+  const isHead = (item: string) => {
+    if (u.kind === 'position') return norm(item) === norm(u.name);
+    if (!u.abbr) return false;
+    return /^(директор|руководитель|начальник)$/u.test(norm(item.replace(new RegExp(u.abbr, 'u'), '')));
+  };
+  return all.find((p) => p !== u && p.positions.some(isHead));
 }
 
 const docOf = (parsed: Record<DocSide, ParsedClause[]>, u: UnitDef) =>

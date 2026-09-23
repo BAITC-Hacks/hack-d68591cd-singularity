@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import type { AnalysisJob } from '../types';
-import { analyze, type DocInput } from './analyze';
+import { analyze, pendingTrace, type DocInput } from './analyze';
 
 /** Задачи анализа в памяти процесса; globalThis переживает hot reload в dev. */
 const g = globalThis as unknown as { __orgdiffJobs?: Map<string, AnalysisJob> };
@@ -10,7 +10,7 @@ const jobs = (g.__orgdiffJobs ??= new Map<string, AnalysisJob>());
 
 export function startJob(docs: DocInput[]): string {
   const id = randomUUID().slice(0, 8);
-  const job: AnalysisJob = { id, status: 'running', trace: [] };
+  const job: AnalysisJob = { id, status: 'running', trace: pendingTrace() };
   jobs.set(id, job);
   analyze(docs, (trace) => {
     job.trace = trace;

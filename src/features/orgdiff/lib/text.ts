@@ -1,7 +1,11 @@
-/** Нормализация для сравнения формулировок: регистр, ё/е, пунктуация, пробелы. */
+/** Латинские буквы, неотличимые от кириллических, — частый артефакт конвертации документов. */
+const LOOKALIKE: Record<string, string> = { a: 'а', e: 'е', o: 'о', p: 'р', c: 'с', x: 'х', y: 'у', k: 'к', m: 'м', h: 'н', t: 'т', b: 'в' };
+
+/** Нормализация для сравнения формулировок: регистр, ё/е, латинские двойники, №, пунктуация, пробелы. */
 export const norm = (s: string) =>
   s
     .toLowerCase()
+    .replace(/№/g, 'no')
     .replace(/ё/g, 'е')
     .replace(/[«»"“”„'`]/g, '')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
@@ -58,10 +62,16 @@ export function stemRegex(phrase: string): RegExp | null {
   return new RegExp(parts.join('\\s+'), 'iu');
 }
 
-/** Цитата действительно есть в тексте пункта (с точностью до нормализации). */
+const lookalikes = (s: string) => s.replace(/[aeopcxykmhtb]/g, (ch) => LOOKALIKE[ch] ?? ch);
+
+/**
+ * Цитата действительно есть в тексте пункта (с точностью до нормализации).
+ * Слишком короткий фрагмент (< 12 символов) подтверждением не считается, если это не весь пункт.
+ */
 export function quoteInText(quote: string, text: string): boolean {
-  const q = norm(quote);
-  return q.length > 0 && norm(text).includes(q);
+  const q = lookalikes(norm(quote));
+  const t = lookalikes(norm(text));
+  return q.length > 0 && t.includes(q) && (q.length >= 12 || q === t);
 }
 
 export const clip = (s: string, n = 220) => (s.length > n ? `${s.slice(0, n).trimEnd()}…` : s);
