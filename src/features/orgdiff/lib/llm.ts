@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
 import OpenAI from 'openai';
 
-export const MODEL = process.env.OPENAI_MODEL || 'gpt-6-astra';
+export const MODEL = process.env.OPENAI_MODEL || 'gpt-6-sol';
 export const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-large';
 
 /**

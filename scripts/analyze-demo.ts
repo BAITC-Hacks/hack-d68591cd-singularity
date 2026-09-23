@@ -8,9 +8,13 @@ import { analyze } from '../src/features/orgdiff/lib/analyze';
 import { demoDocs } from '../src/features/orgdiff/lib/jobs';
 import { FINDING_KIND_LABELS } from '../src/features/orgdiff/types';
 
+const printed = new Set<string>();
 const result = await analyze(await demoDocs(), (trace) => {
-  const s = trace[trace.length - 1];
-  if (s.status !== 'running') console.log(`  ${s.status === 'done' ? '✓' : '✗'} ${s.label}${s.detail ? ` — ${s.detail}` : ''} (${((s.finishedAt! - s.startedAt) / 1000).toFixed(1)}с)`);
+  for (const s of trace) {
+    if ((s.status !== 'done' && s.status !== 'error') || printed.has(s.id)) continue;
+    printed.add(s.id);
+    console.log(`  ${s.status === 'done' ? '✓' : '✗'} ${s.label}${s.detail ? ` — ${s.detail}` : ''} (${((s.finishedAt! - s.startedAt) / 1000).toFixed(1)}с)`);
+  }
 });
 
 console.log(`\nПодразделения:`);
