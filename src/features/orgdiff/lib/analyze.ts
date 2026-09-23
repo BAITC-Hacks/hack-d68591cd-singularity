@@ -30,7 +30,7 @@ import { findRefDefects } from './defects';
 import { extractTables, extractText, isTableFile } from './load-doc';
 import { parseClauses, parseTable, toPublicClause, type ParsedClause } from './parse-clauses';
 import { clip, cosine, jaccard, norm, quoteInText } from './text';
-import { extractStructure, normPosition, unitKey, type UnitDef } from './units';
+import { docHead, docOwner, extractStructure, normPosition, unitKey, type DocHead, type UnitDef } from './units';
 
 export interface DocInput {
   side: DocSide;
@@ -90,6 +90,11 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
   const hitsBefore = llmStats.cacheHits;
   const trace = pendingTrace();
   const meta = new Map<string, { title?: string; short?: string }>();
+  const heads = new Map<string, DocHead>();
+
+  // Метка документа в тексте для LLM — только если на стороне несколько документов (однодокументный промпт не меняется).
+  const docTag = (side: DocSide, docName: string) =>
+    docs.filter((d) => d.side === side).length > 1 ? ` (${meta.get(`${side}:${docName}`)?.short ?? docName})` : '';
 
   const step = async <T>(id: string, label: string, fn: () => Promise<T>, detail?: (r: T) => string): Promise<T> => {
     let s = trace.find((x) => x.id === id);
@@ -128,6 +133,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
         }
         const text = await extractText(d.buffer, d.name);
         meta.set(`${d.side}:${d.name}`, docMeta(text));
+        heads.set(`${d.side}:${d.name}`, docHead(text));
         out[d.side].push(...parseClauses(text, d.side, d.name));
       }
       for (const side of ['before', 'after'] as const) {
@@ -156,16 +162,33 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     (r) => `до: ${r.before.map((u) => u.abbr ?? u.name).join(', ')}; после: ${r.after.map((u) => u.abbr ?? u.name).join(', ')}`
   );
 
-  // 3. Функции с носителями
+  // 3. Функции с носителями. В комплекте из нескольких документов «Положение о Департаменте …» и
+  // «Должностная инструкция …» дают носителя по умолчанию, а пункты приказа — поручения, не функции.
+  const docCtx = (side: DocSide) => {
+    const owners = new Map<string, UnitDef>();
+    const orders = new Set<string>();
+    for (const d of docs.filter((x) => x.side === side)) {
+      const head = heads.get(`${side}:${d.name}`) ?? {};
+      if (head.kind === 'order') orders.add(d.name);
+      const owner = docOwner(head, structure[side]);
+      if (owner) owners.set(d.name, owner);
+    }
+    return { owners, orders };
+  };
+  const ctx = { before: docCtx('before'), after: docCtx('after') };
   const fns = await step(
     'functions',
     'Извлечение функций и их носителей',
     async () => ({
-      before: buildFunctions(parsed.before, structure.before, 'before'),
-      after: buildFunctions(parsed.after, structure.after, 'after')
+      before: buildFunctions(parsed.before, structure.before, 'before', ctx.before),
+      after: buildFunctions(parsed.after, structure.after, 'after', ctx.after)
     }),
-    (r) => `до: ${r.before.length}, после: ${r.after.length}`
+    (r) => {
+      const owned = [...ctx.before.owners, ...ctx.after.owners].map(([doc, u]) => `${doc} → ${u.abbr ?? u.name}`);
+      return `до: ${r.before.length}, после: ${r.after.length}${owned.length ? `; носитель по шапке: ${owned.join(', ')}` : ''}`;
+    }
   );
+  labelDocs(docs, meta, heads, ctx);
 
   // 4. Выравнивание: дословно совпавшие пункты сопоставляются без LLM
   const exact = await step(
@@ -423,7 +446,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     'Итоговое аналитическое заключение',
     async () => {
       const digest = assembled.findings
-        .map((f) => `${f.id} [${f.kind}, ${f.severity}] ${f.title}. ${clip(f.detail, 700)} Источники: ${f.evidence.map((e) => `${e.side === 'before' ? 'до' : 'после'} п. ${e.clauseId}`).join(', ')}`)
+        .map((f) => `${f.id} [${f.kind}, ${f.severity}] ${f.title}. ${clip(f.detail, 700)} Источники: ${f.evidence.map((e) => `${e.side === 'before' ? 'до' : 'после'}${docTag(e.side, e.docName)} п. ${e.clauseId}`).join(', ')}`)
         .join('\n');
       const d = await writeConclusion(digest);
       const ids = new Set(assembled.findings.map((f) => f.id));
@@ -609,6 +632,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     id: f.uid,
     side: f.side,
     unitIds: f.holders.map((h) => unitId(h.key)),
+    docName: f.clause.docName,
     text: f.context ? `${f.context.replace(/:$/, '')}: ${f.clause.text}` : f.clause.text,
     clauseId: f.clause.id,
     quote: quoteOf(f.clause.text)
@@ -930,6 +954,37 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     .map((f, i) => ({ ...f, id: `F${i + 1}` }));
 
   return { units, flows, functions, matches, findings, dropped: raw.length - kept.length, unverified };
+}
+
+/**
+ * Короткие метки документов («ред. 9», «Положение о ДНМ, ред. 2», «Приказ No 45») для ссылок «п. 3.1 (…)».
+ * Нужны, только когда на стороне несколько документов: номера пунктов в них совпадают.
+ */
+function labelDocs(
+  docs: DocInput[],
+  meta: Map<string, { title?: string; short?: string }>,
+  heads: Map<string, DocHead>,
+  ctx: Record<DocSide, { owners: Map<string, UnitDef> }>
+) {
+  for (const side of ['before', 'after'] as const) {
+    const sideDocs = docs.filter((d) => d.side === side);
+    if (sideDocs.length < 2) continue;
+    const labels = sideDocs.map((d) => {
+      const m = meta.get(`${side}:${d.name}`) ?? {};
+      const head = heads.get(`${side}:${d.name}`) ?? {};
+      const owner = ctx[side].owners.get(d.name);
+      const who = owner && (owner.abbr ?? owner.name);
+      if (who && head.kind === 'job') return [`ДИ ${who}`, m.short].filter(Boolean).join(', ');
+      if (who) return [`Положение о ${who}`, m.short].filter(Boolean).join(', ');
+      if (head.kind === 'order') return `Приказ${m.title?.match(/No\s*\d+/u) ? ` ${m.title.match(/No\s*\d+/u)![0]}` : ''}`;
+      return m.short ?? d.name.replace(/\.[^.]+$/, '');
+    });
+    sideDocs.forEach((d, i) => {
+      const dup = labels.filter((l) => l === labels[i]).length > 1;
+      const key = `${side}:${d.name}`;
+      meta.set(key, { ...meta.get(key), short: dup ? `${labels[i]} (${d.name})` : labels[i] });
+    });
+  }
 }
 
 /** Стабильный id результата: хеш сторон, имён и содержимого документов. */
