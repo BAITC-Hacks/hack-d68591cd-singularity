@@ -16,7 +16,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ jobId: startJob(await demoDocs()) });
   }
 
-  const form = await req.formData();
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return NextResponse.json({ error: 'Ожидается multipart/form-data с файлами before и after' }, { status: 400 });
+  }
   const docs: DocInput[] = [];
   for (const side of ['before', 'after'] as const) {
     for (const f of [...form.getAll(side), ...form.getAll(`${side}[]`)]) {
