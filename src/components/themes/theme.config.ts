@@ -1,8 +1,5 @@
-/**
- * Default theme that loads when no user preference is set
- * Change this value to set a different default theme
- */
-export const DEFAULT_THEME = 'vercel';
+/** Тема оформления зафиксирована: выбор темы пользователем отключён. */
+export const DEFAULT_THEME = 'discord';
 
 export const THEMES = [
   {
