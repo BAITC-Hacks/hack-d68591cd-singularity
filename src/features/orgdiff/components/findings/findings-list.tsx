@@ -24,7 +24,7 @@ export function FindingsList({ result }: { result: AnalysisResult }) {
   const [{ kind, review }, setFilters] = useFindingFilters();
   const [, setParams] = useOrgdiffParams();
   const openSource = useOpenSource();
-  const { reviews, setReview } = useFindingReviews(result.meta.generatedAt);
+  const { reviews, setReview } = useFindingReviews(result);
 
   const unitNames = useMemo(
     () => new Map(result.units.map((unit) => [unit.id, unitLabel(unit)])),

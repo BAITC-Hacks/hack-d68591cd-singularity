@@ -8,8 +8,21 @@
 // (демо не зависит от LLM).
 // ============================================================
 
-import { ANALYZE_ENDPOINT, MOCK_STEP_MS, SAMPLE_SET, USE_MOCK } from '../constants';
-import type { AnalysisJob, AnalysisResult, DocSide, TraceStep } from '../types';
+import {
+  ANALYZE_ENDPOINT,
+  MOCK_STEP_MS,
+  REPORT_ENDPOINT,
+  SAMPLE_SET,
+  USE_MOCK
+} from '../constants';
+import type {
+  AnalysisJob,
+  AnalysisResult,
+  DocSide,
+  FindingReview,
+  ReportRequest,
+  TraceStep
+} from '../types';
 
 export interface AnalyzePayload {
   before: File[];
@@ -17,6 +30,11 @@ export interface AnalyzePayload {
 }
 
 const MOCK_JOB_PREFIX = 'mock-';
+
+const NETWORK_ERROR =
+  'Нет связи с сервером анализа. Проверьте, что приложение запущено (bun run dev), и повторите.';
+const JOB_LOST_ERROR =
+  'Сервер потерял задачу анализа (скорее всего, он был перезапущен). Запустите анализ ещё раз.';
 
 export type ReportFormat = 'docx' | 'md';
 
@@ -28,7 +46,7 @@ export async function startAnalysis(payload: AnalyzePayload): Promise<string> {
   payload.after.forEach((file) => body.append('after[]', file, file.name));
 
   // Без Content-Type: браузер сам проставит multipart boundary
-  const res = await fetch(ANALYZE_ENDPOINT, { method: 'POST', body });
+  const res = await request(ANALYZE_ENDPOINT, { method: 'POST', body });
   const data = await readJson(res);
   if (!isRecord(data) || typeof data.jobId !== 'string') {
     throw new Error('Пайплайн не вернул идентификатор задачи');
@@ -37,9 +55,7 @@ export async function startAnalysis(payload: AnalyzePayload): Promise<string> {
 }
 
 export async function getAnalysisJob(jobId: string): Promise<AnalysisJob> {
-  const raw = jobId.startsWith(MOCK_JOB_PREFIX)
-    ? await getMockJob(jobId)
-    : await readJson(await fetch(`${ANALYZE_ENDPOINT}/${encodeURIComponent(jobId)}`));
+  const raw = jobId.startsWith(MOCK_JOB_PREFIX) ? await getMockJob(jobId) : await fetchJob(jobId);
 
   if (!isRecord(raw) || typeof raw.status !== 'string' || !Array.isArray(raw.trace)) {
     console.error('[orgdiff] Некорректный ответ задачи', raw);
@@ -59,7 +75,7 @@ export async function loadSampleSet(): Promise<Record<DocSide, File[]>> {
 }
 
 async function fetchSampleFile({ url, name }: { url: string; name: string }): Promise<File> {
-  const res = await fetch(url);
+  const res = await request(url);
   if (!res.ok) {
     throw new Error(`Не удалось загрузить тестовый файл ${name} (${res.status})`);
   }
@@ -85,6 +101,22 @@ async function getMockJob(jobId: string): Promise<AnalysisJob> {
     return { ...step, status, detail: undefined, finishedAt: undefined };
   });
   return { id: jobId, status: 'running', trace };
+}
+
+async function fetchJob(jobId: string): Promise<unknown> {
+  const res = await request(`${ANALYZE_ENDPOINT}/${encodeURIComponent(jobId)}`);
+  if (res.status === 404) throw new Error(JOB_LOST_ERROR);
+  return readJson(res);
+}
+
+/** fetch с понятной ошибкой вместо «Failed to fetch», когда сервер недоступен */
+async function request(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    console.error('[orgdiff] Сетевая ошибка', url, error);
+    throw new Error(NETWORK_ERROR, { cause: error });
+  }
 }
 
 async function readJson(res: Response): Promise<unknown> {
@@ -134,20 +166,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-/** Задачи мока живут только в браузере — у сервера для них отчёта нет */
-export function canDownloadReport(jobId: string | undefined): jobId is string {
-  return jobId !== undefined && !jobId.startsWith(MOCK_JOB_PREFIX);
-}
-
-/** Файл заключения от пайплайна: GET /api/analyze/{jobId}/report?format=… */
-export async function downloadReport(jobId: string, format: ReportFormat): Promise<Blob> {
-  const res = await fetch(
-    `${ANALYZE_ENDPOINT}/${encodeURIComponent(jobId)}/report?format=${format}`
-  );
+/**
+ * Файл заключения без состояния сервера: POST /api/report?format=… с результатом
+ * и решениями сотрудника. Работает и для мока, и после перезапуска сервера.
+ */
+export async function downloadReport(
+  result: AnalysisResult,
+  reviews: Readonly<Record<string, FindingReview>>,
+  format: ReportFormat
+): Promise<Blob> {
+  const body: ReportRequest = { result: reportPayload(result), reviews };
+  const res = await request(`${REPORT_ENDPOINT}?format=${format}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
   if (!res.ok) {
     const data: unknown = await res.json().catch(() => null);
     const message = isRecord(data) && typeof data.error === 'string' ? data.error : null;
     throw new Error(message ?? `Не удалось сформировать файл (${res.status})`);
   }
   return res.blob();
+}
+
+/**
+ * Генератору отчёта (lib/report.ts) нужны только заключение, выводы, подразделения,
+ * документы, статистика и meta. Тексты пунктов, функции и сопоставления — ~1,4 МБ —
+ * не отправляем; если отчёт начнёт их использовать, убрать это сокращение.
+ */
+function reportPayload(result: AnalysisResult): AnalysisResult {
+  return { ...result, clauses: [], functions: [], matches: [], flows: [], trace: [] };
 }

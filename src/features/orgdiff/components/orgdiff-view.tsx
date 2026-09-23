@@ -10,16 +10,22 @@ import { FindingsList } from './findings/findings-list';
 import { FunctionTable } from './function-table/function-table';
 import { OrgChart } from './org-chart/org-chart';
 import { ResultPlaceholder } from './result-placeholder';
+import { TabErrorBoundary } from './tab-error-boundary';
 import { UploadPanel } from './upload-panel';
 
 type ResultTab = Exclude<OrgdiffTab, 'upload'>;
 
-const RESULT_TABS: { id: ResultTab; label: string }[] = [
-  { id: 'chart', label: 'Схема' },
-  { id: 'functions', label: 'Функции' },
-  { id: 'findings', label: 'Находки' },
-  { id: 'conclusion', label: 'Заключение' }
-];
+const RESULT_TAB_LABELS: Record<ResultTab, string> = {
+  chart: 'Схема',
+  functions: 'Функции',
+  findings: 'Находки',
+  conclusion: 'Заключение'
+};
+
+const RESULT_TABS = (Object.keys(RESULT_TAB_LABELS) as ResultTab[]).map((id) => ({
+  id,
+  label: RESULT_TAB_LABELS[id]
+}));
 
 export function OrgdiffView() {
   const [{ tab, source }, setParams] = useOrgdiffParams();
@@ -53,7 +59,9 @@ export function OrgdiffView() {
         {RESULT_TABS.map(({ id }) => (
           <TabsContent key={id} value={id} className='pt-2'>
             {result ? (
-              <ResultTabContent tab={id} result={result} />
+              <TabErrorBoundary key={result.meta.generatedAt} label={RESULT_TAB_LABELS[id]}>
+                <ResultTabContent tab={id} result={result} />
+              </TabErrorBoundary>
             ) : (
               <ResultPlaceholder
                 title='Анализ ещё не запускался'
@@ -73,6 +81,9 @@ function ResultTabContent({ tab, result }: { tab: ResultTab; result: AnalysisRes
   const [{ unit, finding }, setParams] = useOrgdiffParams();
   const selectUnit = (unitId: string | null) => void setParams({ unit: unitId, finding: null });
 
+  const empty = emptyTabMessage(tab, result);
+  if (empty) return <ResultPlaceholder title={empty.title} description={empty.description} />;
+
   if (tab === 'chart') {
     return (
       <OrgChart
@@ -90,4 +101,42 @@ function ResultTabContent({ tab, result }: { tab: ResultTab; result: AnalysisRes
   }
   if (tab === 'findings') return <FindingsList result={result} />;
   return <ConclusionView result={result} />;
+}
+
+/**
+ * Анализ прошёл, но данных для вкладки нет (например, загружены документы без
+ * раздела о структуре) — объясняем, что это значит, вместо пустой схемы или таблицы.
+ */
+function emptyTabMessage(
+  tab: ResultTab,
+  result: AnalysisResult
+): { title: string; description: string } | null {
+  if (tab === 'chart' && result.units.length === 0) {
+    return {
+      title: 'Подразделения не найдены',
+      description:
+        'В документах не удалось выделить состав подразделений (обычно это раздел «Структура»). Проверьте, что загружены положения о подразделениях или оргструктура.'
+    };
+  }
+  if (tab === 'functions' && result.matches.length === 0) {
+    return {
+      title: 'Функции не извлечены',
+      description:
+        'В документах не найдено пунктов с функциями подразделений, сопоставлять нечего. Проверьте, что загружены положения с разделом о функциях или обязанностях.'
+    };
+  }
+  const { conclusion } = result;
+  if (
+    tab === 'conclusion' &&
+    !conclusion.summary.trim() &&
+    conclusion.sections.length === 0 &&
+    conclusion.recommendations.length === 0
+  ) {
+    return {
+      title: 'Заключение не сформировано',
+      description:
+        'Пайплайн не вернул текст заключения. Выводы с источниками доступны на вкладке «Находки».'
+    };
+  }
+  return null;
 }

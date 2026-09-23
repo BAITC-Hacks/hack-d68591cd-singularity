@@ -19,7 +19,7 @@ import { FindingRefs } from './finding-refs';
 /** Итоговое заключение в виде служебной записки (must have 5 ТЗ) */
 export function ConclusionView({ result }: { result: AnalysisResult }) {
   const { conclusion } = result;
-  const { reviews } = useFindingReviews(result.meta.generatedAt);
+  const { reviews } = useFindingReviews(result);
   const openSource = useOpenSource();
   const findings = useMemo(
     () => new Map(result.findings.map((finding) => [finding.id, finding])),
@@ -39,7 +39,7 @@ export function ConclusionView({ result }: { result: AnalysisResult }) {
               Заключение по анализу организационной структуры и функционала
             </h2>
           </div>
-          <ConclusionActions markdown={markdown} />
+          <ConclusionActions result={result} reviews={reviews} markdown={markdown} />
         </div>
         <dl className='grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]'>
           <dt className='text-muted-foreground'>Документы «до»</dt>
