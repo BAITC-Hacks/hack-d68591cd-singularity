@@ -5,6 +5,7 @@ import { memo } from 'react';
 import { cn } from '@/lib/utils';
 import { NODE_WIDTH, type UnitNode as UnitNodeType } from '../../utils/build-org-graph';
 import { UNIT_STATUS_META, unitLabel } from '../../utils/unit-status';
+import { UnitStatusChip } from '../unit-status-chip';
 
 const VISIBLE_POSITIONS = 3;
 
@@ -17,22 +18,16 @@ function UnitNodeComponent({ data }: NodeProps<UnitNodeType>) {
     <div
       style={{ width: NODE_WIDTH }}
       className={cn(
-        'text-card-foreground rounded-lg border-2 px-3 py-2 shadow-sm transition-all',
-        meta.nodeClass,
+        'bg-card text-card-foreground rounded-lg border border-l-4 px-3 py-2 shadow-sm transition-all',
+        meta.accentClass,
         focus === 'selected' && 'ring-primary ring-2 ring-offset-2',
         focus === 'dimmed' && 'opacity-35'
       )}
     >
       {side === 'after' ? <Handle type='target' position={Position.Left} /> : null}
 
-      <div className='flex items-start justify-between gap-2'>
-        <p className='text-sm leading-tight font-semibold'>{unitLabel(unit)}</p>
-        <span
-          className={cn('shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium', meta.badgeClass)}
-        >
-          {meta.label}
-        </span>
-      </div>
+      <UnitStatusChip status={unit.status} size='md' />
+      <p className='mt-1 text-sm leading-tight font-semibold'>{unitLabel(unit)}</p>
       {unit.abbr ? (
         <p className='text-muted-foreground mt-0.5 line-clamp-2 text-xs leading-snug'>
           {unit.name}

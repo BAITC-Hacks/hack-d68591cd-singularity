@@ -16,6 +16,11 @@ import { UploadPanel } from './upload-panel';
 
 type ResultTab = Exclude<OrgdiffTab, 'upload'>;
 
+/** Вкладки крупнее, чем в шаблоне: это главная навигация экрана; на узком экране — прокрутка */
+const TABS_LIST_CLASS =
+  'max-w-full justify-start overflow-x-auto p-1 group-data-horizontal/tabs:h-11';
+const TAB_TRIGGER_CLASS = 'px-4 text-base';
+
 const RESULT_TAB_LABELS: Record<ResultTab, string> = {
   chart: 'Схема',
   functions: 'Функции',
@@ -43,10 +48,12 @@ export function OrgdiffView() {
         />
       ) : null}
       <Tabs value={tab} onValueChange={(value) => void setParams({ tab: value as OrgdiffTab })}>
-        <TabsList>
-          <TabsTrigger value='upload'>Загрузка</TabsTrigger>
+        <TabsList className={TABS_LIST_CLASS}>
+          <TabsTrigger value='upload' className={TAB_TRIGGER_CLASS}>
+            Загрузка
+          </TabsTrigger>
           {RESULT_TABS.map(({ id, label }) => (
-            <TabsTrigger key={id} value={id} disabled={!result}>
+            <TabsTrigger key={id} value={id} disabled={!result} className={TAB_TRIGGER_CLASS}>
               {label}
             </TabsTrigger>
           ))}

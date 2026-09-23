@@ -1,41 +1,44 @@
+import type { Icons } from '@/components/icons';
 import type { UnitChange, UnitStatus } from '../types';
+import { FINDING_KIND_META } from './finding-meta';
 
 export interface UnitStatusMeta {
   label: string;
-  /** Рамка и фон узла схемы */
-  nodeClass: string;
-  /** Бейдж статуса */
-  badgeClass: string;
-  /** Цвет для легенды */
-  swatchClass: string;
+  /** Иконка и её цвет — те же, что у соответствующего вида находки */
+  icon: keyof typeof Icons;
+  iconClass: string;
+  /** Цветная полоса слева — как у карточек-счётчиков в «Находках» */
+  accentClass: string;
 }
 
 export const UNIT_STATUS_META: Record<UnitStatus, UnitStatusMeta> = {
   created: {
     label: 'Создано',
-    nodeClass: 'border-emerald-500 bg-emerald-500/10',
-    badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-    swatchClass: 'border-emerald-500 bg-emerald-500/20'
+    icon: FINDING_KIND_META.unit_created.icon,
+    iconClass: FINDING_KIND_META.unit_created.iconClass,
+    accentClass: 'border-l-emerald-500'
   },
   retained: {
     label: 'Сохранено',
-    nodeClass: 'border-border bg-card',
-    badgeClass: 'bg-muted text-muted-foreground',
-    swatchClass: 'border-border bg-card'
+    icon: 'circleCheck',
+    iconClass: 'text-muted-foreground',
+    accentClass: 'border-l-muted-foreground/40'
   },
   reorganized: {
     label: 'Реорганизовано',
-    nodeClass: 'border-amber-500 bg-amber-500/10',
-    badgeClass: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
-    swatchClass: 'border-amber-500 bg-amber-500/20'
+    icon: FINDING_KIND_META.unit_reorganized.icon,
+    iconClass: FINDING_KIND_META.unit_reorganized.iconClass,
+    accentClass: 'border-l-amber-500'
   },
   removed: {
     label: 'Упразднено',
-    nodeClass: 'border-dashed border-red-500 bg-red-500/5',
-    badgeClass: 'bg-red-500/15 text-red-700 dark:text-red-300',
-    swatchClass: 'border-dashed border-red-500 bg-red-500/10'
+    icon: FINDING_KIND_META.unit_removed.icon,
+    iconClass: FINDING_KIND_META.unit_removed.iconClass,
+    accentClass: 'border-l-red-500'
   }
 };
+
+export const UNIT_STATUSES: UnitStatus[] = ['created', 'reorganized', 'removed', 'retained'];
 
 export function unitLabel(unit: Pick<UnitChange, 'abbr' | 'name'>): string {
   return unit.abbr ?? unit.name;

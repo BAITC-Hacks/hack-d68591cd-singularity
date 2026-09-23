@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,14 @@ export function UploadPanel({ onShowResults }: UploadPanelProps) {
   });
 
   const isRunning = run.status === 'running';
+
+  // Блок статуса стоит над загрузкой: при запуске и завершении прокручиваем к нему,
+  // иначе после нажатия «Анализировать» внизу страницы он окажется вне экрана
+  const statusRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (run.status === 'idle') return;
+    statusRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [run.status]);
   const isBusy = isRunning || sample.isPending;
   const missing = getMissingHint(files);
 
@@ -44,6 +52,22 @@ export function UploadPanel({ onShowResults }: UploadPanelProps) {
 
   return (
     <div className='flex min-w-0 flex-col gap-4'>
+      {run.status === 'idle' ? null : (
+        <div ref={statusRef} className='flex min-w-0 scroll-mt-4 flex-col gap-4'>
+          {run.result ? (
+            <AnalysisDoneBanner result={run.result} onShowResults={onShowResults} />
+          ) : null}
+          <PipelineProgress
+            // После завершения шаги сворачиваются — главное теперь плашка с итогом
+            key={run.status === 'done' ? 'done' : 'active'}
+            status={run.status}
+            trace={run.trace}
+            error={run.error}
+            onRetry={missing === null ? () => run.start(files) : undefined}
+          />
+        </div>
+      )}
+
       <div className='bg-muted/40 flex min-w-0 flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between'>
         <div className='min-w-0'>
           <p className='text-sm font-medium'>Нет своих документов под рукой?</p>
@@ -91,17 +115,6 @@ export function UploadPanel({ onShowResults }: UploadPanelProps) {
         </Button>
         {missing ? <p className='text-muted-foreground text-xs'>{missing}</p> : null}
       </div>
-
-      {run.status === 'idle' ? null : (
-        <PipelineProgress
-          status={run.status}
-          trace={run.trace}
-          error={run.error}
-          onRetry={missing === null ? () => run.start(files) : undefined}
-        />
-      )}
-
-      {run.result ? <AnalysisDoneBanner result={run.result} onShowResults={onShowResults} /> : null}
     </div>
   );
 }

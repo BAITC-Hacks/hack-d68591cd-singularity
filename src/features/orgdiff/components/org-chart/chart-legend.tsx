@@ -1,19 +1,12 @@
-import { cn } from '@/lib/utils';
-import type { UnitStatus } from '../../types';
-import { UNIT_STATUS_META } from '../../utils/unit-status';
-
-const STATUSES: UnitStatus[] = ['created', 'retained', 'reorganized', 'removed'];
+import { UNIT_STATUSES } from '../../utils/unit-status';
+import { UnitStatusChip } from '../unit-status-chip';
 
 export function ChartLegend() {
   return (
-    <div className='text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs'>
-      {STATUSES.map((status) => (
-        <span key={status} className='inline-flex items-center gap-1.5'>
-          <span
-            className={cn('size-3 rounded-sm border-2', UNIT_STATUS_META[status].swatchClass)}
-          />
-          {UNIT_STATUS_META[status].label}
-        </span>
+    <div className='text-muted-foreground bg-card flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border px-3 py-2 text-xs'>
+      <span className='text-foreground font-medium'>Легенда:</span>
+      {UNIT_STATUSES.map((status) => (
+        <UnitStatusChip key={status} status={status} className='text-foreground' />
       ))}
       <span className='inline-flex items-center gap-1.5'>
         <svg width='24' height='6' aria-hidden='true'>

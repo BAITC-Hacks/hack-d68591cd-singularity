@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { useFindingReviews } from '../../hooks/use-finding-reviews';
 import { useOpenSource, useOrgdiffParams } from '../../hooks/use-orgdiff-params';
 import type { AnalysisResult } from '../../types';
@@ -14,7 +13,8 @@ import {
   formatDate,
   reviewSummary
 } from '../../utils/conclusion-markdown';
-import { UNIT_STATUS_META, unitLabel } from '../../utils/unit-status';
+import { unitLabel } from '../../utils/unit-status';
+import { UnitStatusChip } from '../unit-status-chip';
 import { ConclusionActions } from './conclusion-actions';
 import { FindingRefs } from './finding-refs';
 
@@ -65,7 +65,6 @@ export function ConclusionView({ result }: { result: AnalysisResult }) {
       <Section title='2. Состав подразделений'>
         <ul className='flex flex-col divide-y rounded-md border'>
           {result.units.map((unit) => {
-            const meta = UNIT_STATUS_META[unit.status];
             return (
               <li key={unit.id}>
                 <button
@@ -74,11 +73,7 @@ export function ConclusionView({ result }: { result: AnalysisResult }) {
                   className='hover:bg-muted/50 flex w-full flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2 text-left'
                 >
                   <span className='font-medium'>{unitLabel(unit)}</span>
-                  <span
-                    className={cn('rounded px-1.5 py-0.5 text-xs font-medium', meta.badgeClass)}
-                  >
-                    {meta.label}
-                  </span>
+                  <UnitStatusChip status={unit.status} />
                   <span className='text-muted-foreground basis-full text-sm'>{unit.summary}</span>
                 </button>
               </li>

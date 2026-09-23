@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,14 +26,34 @@ const STATUS_TEXT: Record<RunStatus, string> = {
 
 export function PipelineProgress({ status, trace, error, onRetry }: PipelineProgressProps) {
   const percent = getPercent(status, trace);
+  // После успешного завершения шаги свёрнуты: итог уже в плашке выше
+  const [expanded, setExpanded] = useState(status !== 'done');
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Ход анализа</CardTitle>
-        <CardDescription>{STATUS_TEXT[status]}</CardDescription>
+    <Card className={cn(!expanded && 'gap-0 py-3')}>
+      <CardHeader className={cn(!expanded && 'py-0')}>
+        <div className='flex items-center justify-between gap-3'>
+          <div className='flex flex-col gap-1'>
+            <CardTitle>Ход анализа</CardTitle>
+            <CardDescription>
+              {STATUS_TEXT[status]}
+              {status === 'done' ? ` · шагов агента: ${trace.length}` : ''}
+            </CardDescription>
+          </div>
+          {status === 'done' ? (
+            <Button
+              variant='ghost'
+              size='sm'
+              aria-expanded={expanded}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              {expanded ? 'Свернуть шаги' : 'Показать шаги'}
+              {expanded ? <Icons.chevronUp /> : <Icons.chevronDown />}
+            </Button>
+          ) : null}
+        </div>
       </CardHeader>
-      <CardContent className='flex flex-col gap-4'>
+      <CardContent className={cn('flex flex-col gap-4', !expanded && 'hidden')}>
         <Progress value={percent} aria-label='Прогресс анализа' />
         <ol className='flex flex-col gap-1.5'>
           {trace.map((step, index) => (
