@@ -57,7 +57,7 @@ export function UploadDropzone({ side, files, disabled, onFilesChange }: UploadD
   });
 
   return (
-    <Card className='flex-1'>
+    <Card className='min-w-0 flex-1'>
       <CardHeader>
         <CardTitle className='flex items-center gap-2'>
           {labels.title}

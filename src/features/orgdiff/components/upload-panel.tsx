@@ -43,15 +43,15 @@ export function UploadPanel({ onShowResults }: UploadPanelProps) {
     setFiles((prev) => ({ ...prev, [side]: next }));
 
   return (
-    <div className='flex flex-col gap-4'>
-      <div className='bg-muted/40 flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between'>
-        <div>
+    <div className='flex min-w-0 flex-col gap-4'>
+      <div className='bg-muted/40 flex min-w-0 flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='min-w-0'>
           <p className='text-sm font-medium'>Нет своих документов под рукой?</p>
           <p className='text-muted-foreground text-sm'>
             Тестовый комплект: {SAMPLE_SET_LABEL} (реальные .docx)
           </p>
         </div>
-        <div className='flex gap-2'>
+        <div className='flex flex-wrap gap-2'>
           <Button variant='outline' disabled={isBusy} onClick={() => sample.mutate()}>
             {sample.isPending ? <Icons.spinner className='animate-spin' /> : <Icons.sparkles />}
             Загрузить тестовый комплект (ред. 8 → ред. 9)
@@ -69,7 +69,7 @@ export function UploadPanel({ onShowResults }: UploadPanelProps) {
         </div>
       </div>
 
-      <div className='flex flex-col gap-4 lg:flex-row'>
+      <div className='flex min-w-0 flex-col gap-4 lg:flex-row'>
         <UploadDropzone
           side='before'
           files={files.before}

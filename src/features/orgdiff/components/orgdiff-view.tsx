@@ -52,7 +52,7 @@ export function OrgdiffView() {
           ))}
         </TabsList>
 
-        <TabsContent value='upload' keepMounted className='pt-2'>
+        <TabsContent value='upload' keepMounted className='min-w-0 pt-2'>
           <UploadPanel
             onShowResults={() => void setParams({ tab: 'findings', unit: null, finding: null })}
           />
