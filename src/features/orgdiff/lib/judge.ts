@@ -189,6 +189,8 @@ const COI_SCHEMA = S.obj({
 });
 
 export async function findConflicts(fns: Fn[], extra: Fn[]): Promise<CoiItem[]> {
+  // Нет функций (например, сравниваются только таблицы оргструктуры) — не с чем работать, модель не зовём.
+  if (!fns.length && !extra.length) return [];
   const byHolder = new Map<string, Fn[]>();
   for (const f of [...fns, ...extra]) {
     const key = f.holders.length ? f.holders.map((h) => h.abbr ?? h.name).join(', ') : 'Блок в целом';
@@ -236,6 +238,7 @@ export async function extractUnitsLLM(clauses: ParsedClause[]): Promise<LlmUnit[
   const relevant = clauses
     .filter((c) => /департамент|управлени|отдел|служб|центр|сектор|дирекци|подчиня|штат|структур/iu.test(c.text))
     .slice(0, 150);
+  if (!relevant.length) return [];
   const prompt = `Определи состав организационной структуры по документу: структурные подразделения (unit) и самостоятельные руководящие должности вне подразделений (position), с должностями в подчинении. Только то, что прямо следует из текста.
 
 ${relevant.map((c) => `п. ${c.id}: «${clip(c.text, 300)}»`).join('\n')}`;

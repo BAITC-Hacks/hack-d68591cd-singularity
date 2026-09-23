@@ -22,8 +22,8 @@ import {
   type MatchVerdict
 } from './judge';
 import { embed, llmStats, MODEL } from './llm';
-import { extractText } from './load-doc';
-import { parseClauses, toPublicClause, type ParsedClause } from './parse-clauses';
+import { extractTables, extractText, isTableFile } from './load-doc';
+import { parseClauses, parseTable, toPublicClause, type ParsedClause } from './parse-clauses';
 import { clip, cosine, jaccard, norm, quoteInText } from './text';
 import { extractStructure, normPosition, unitKey, type UnitDef } from './units';
 
@@ -69,7 +69,9 @@ export function docMeta(text: string): { title?: string; short?: string } {
   const i = lines.findIndex((l) => /^(ПОЛОЖЕНИЕ|ПОЛИТИКА|РЕГЛАМЕНТ|ИНСТРУКЦИЯ|ПРИКАЗ|СТРУКТУРА|ДОЛЖНОСТНАЯ)/u.test(l));
   const short = red ? `ред. ${red[1]}` : undefined;
   if (i < 0) return { short };
-  const raw = [lines[i], lines[i + 1] ?? ''].join(' ').replace(/\(редакция[^)]*\)/iu, '').trim();
+  // Вторая строка названия («О ВНУТРЕННЕМ АУДИТЕ …»), но не первый пункт документа («1. Общие положения»).
+  const next = lines[i + 1] && !/^(?:\d|от\s)/iu.test(lines[i + 1]) ? lines[i + 1] : '';
+  const raw = [lines[i], next].join(' ').replace(/\(редакция[^)]*\)/iu, '').trim();
   const words = raw.split(/\s+/).map((w, k) => (w.length >= 4 && w === w.toUpperCase() ? w.toLowerCase() : k > 0 && w.length === 1 ? w.toLowerCase() : w));
   const title = words.join(' ').replace(/^\p{L}/u, (c) => c.toUpperCase());
   return { title: `${title}${short ? `, ${short}` : ''}${date ? ` от ${date[1]} ${date[2]} ${date[3]} г.` : ''}`, short };
@@ -111,9 +113,20 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     async () => {
       const out: Record<DocSide, ParsedClause[]> = { before: [], after: [] };
       for (const d of docs) {
+        if (isTableFile(d.name)) {
+          // Таблица оргструктуры/штатного расписания: строка = пункт с адресом «стр. N».
+          out[d.side].push(...parseTable(await extractTables(d.buffer), d.side, d.name));
+          meta.set(`${d.side}:${d.name}`, {});
+          continue;
+        }
         const text = await extractText(d.buffer, d.name);
         meta.set(`${d.side}:${d.name}`, docMeta(text));
         out[d.side].push(...parseClauses(text, d.side, d.name));
+      }
+      for (const side of ['before', 'after'] as const) {
+        if (!out[side].length) {
+          throw new Error(`Не удалось выделить пункты в документах «${side === 'before' ? 'до' : 'после'}»: нужен текст с нумерацией пунктов или таблица оргструктуры`);
+        }
       }
       return out;
     },
@@ -414,17 +427,28 @@ function buildAllClauseFns(clauses: ParsedClause[], fns: Fn[]): Fn[] {
 
 async function unitsViaLLM(clauses: ParsedClause[], side: DocSide): Promise<UnitDef[]> {
   const found = await extractUnitsLLM(clauses);
-  const byId = new Map(clauses.map((c) => [c.id, c]));
+  // Номер пункта мог повториться в нескольких документах стороны — берём пункт, где цитата действительно есть.
+  const pick = (id: string, quote: string) => {
+    const cs = clauses.filter((c) => c.id === id.replace(/^п\.\s*/u, '').trim());
+    return cs.find((c) => quoteInText(quote, c.text)) ?? cs[0];
+  };
+  const seen = new Set<string>();
   return found
-    .filter((u) => byId.has(u.clauseId))
-    .map((u) => {
-      const c = byId.get(u.clauseId)!;
+    .map((u) => ({ u, c: pick(u.clauseId, u.quote) }))
+    .filter(({ u, c }) => {
+      const key = unitKey(u.name, u.abbr || undefined);
+      if (!c || !u.name.trim() || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map(({ u, c }) => {
       return {
         key: unitKey(u.name, u.abbr || undefined),
         name: u.name,
         abbr: u.abbr || undefined,
         kind: u.kind,
         side,
+        docName: c.docName,
         clauseId: c.id,
         quote: quoteInText(u.quote, c.text) ? u.quote : c.text,
         positions: u.positions
@@ -559,10 +583,10 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     const posEv: Partial<Record<DocSide, Evidence>> = {};
     for (const x of [b, a]) {
       if (!x) continue;
-      const c = clauseOf(x.side, docOf(parsed, x), x.clauseId);
+      const c = clauseOf(x.side, x.docName, x.clauseId);
       if (c) evidence.push((nameEv[x.side] = ev(c, x.quote)));
       if (x.positionsClauseId) {
-        const pc = clauseOf(x.side, docOf(parsed, x), x.positionsClauseId);
+        const pc = clauseOf(x.side, x.docName, x.positionsClauseId);
         if (pc) evidence.push((posEv[x.side] = ev(pc)));
       }
     }
@@ -628,7 +652,12 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     raw.push({
       kind: 'unit_reorganized',
       severity: 'medium',
-      title: `Признаки преобразования: ${r.abbr ?? r.name} → ${toCreated.map((f) => units.find((x) => x.id === f.to)!.abbr ?? f.to).join(', ')}`,
+      title: `Признаки преобразования: ${r.abbr ?? r.name} → ${toCreated
+        .map((f) => {
+          const u = units.find((x) => x.id === f.to)!;
+          return u.abbr ?? u.name;
+        })
+        .join(', ')}`,
       detail: `Функции «${r.name}» перешли во вновь созданные подразделения: ${names.join(', ')} из ${total} переданных функций.`,
       unitIds: [r.id, ...toCreated.map((f) => f.to)],
       evidence: [...r.evidence.slice(0, 1), ...toCreated.flatMap((f) => f.evidence.slice(0, 2))],
@@ -762,6 +791,4 @@ function parentUnit(u: UnitDef, all: UnitDef[]): UnitDef | undefined {
   return all.find((p) => p !== u && p.positions.some(isHead));
 }
 
-const docOf = (parsed: Record<DocSide, ParsedClause[]>, u: UnitDef) =>
-  parsed[u.side].find((c) => c.id === u.clauseId)?.docName ?? '';
 

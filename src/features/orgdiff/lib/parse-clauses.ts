@@ -1,4 +1,5 @@
 import type { Clause, DocSide } from '../types';
+import type { TableSheet } from './load-doc';
 
 /** Пункт с внутренними полями пайплайна, которые не уходят в интерфейс. */
 export interface ParsedClause extends Clause {
@@ -6,6 +7,11 @@ export interface ParsedClause extends Clause {
   parentId?: string;
   /** Ненумерованный заголовок роли над пунктом («Главный аудитор:») */
   roleHint?: string;
+  /** Строка таблицы (Excel): заголовок столбца → значение */
+  cells?: Record<string, string>;
+  /** Полный текст строки «N. …» раздела и длина отделённого от заголовка текста — для плоской нумерации */
+  heading?: string;
+  bodyLen?: number;
 }
 
 /** "1. Общие положения" — заголовок раздела верхнего уровня. */
@@ -87,7 +93,7 @@ export function parseClauses(raw: string, side: DocSide, docName: string): Parse
   const seenSections = new Set<string>();
 
   const push = () => {
-    if (current && current.text.trim()) clauses.push(current);
+    if (current && (current.text.trim() || current.heading)) clauses.push(current);
     current = null;
   };
 
@@ -122,7 +128,7 @@ export function parseClauses(raw: string, side: DocSide, docName: string): Parse
         sectionTitle = title.replace(/\s+\d+$/, '').replace(/[.:]$/, '').trim();
         roleHint = undefined;
         // Текст, идущий сразу за заголовком, сохраняем как пункт «N» — иначе он потеряет адрес.
-        current = { id: section, section, sectionTitle, text: body, side, docName };
+        current = { id: section, section, sectionTitle, text: body, side, docName, heading: sectionM[2], bodyLen: body.length };
         continue;
       }
     }
@@ -167,16 +173,63 @@ export function parseClauses(raw: string, side: DocSide, docName: string): Parse
   }
   push();
 
+  // Плоская нумерация («1. Создать Департамент …», «2. Упразднить …» в приказе): у раздела нет подпунктов,
+  // а «заголовок» — это законченная фраза. Возвращаем её в текст пункта, иначе пункт потеряется или обрежется.
+  const withSub = new Set(clauses.filter((c) => c.id !== c.section).map((c) => c.section));
+  for (const c of clauses) {
+    if (c.id !== c.section || c.heading === undefined || withSub.has(c.section)) continue;
+    if (!/[.;:!?]$/u.test(c.heading.trim()) || c.heading.length < 30) continue;
+    const rest = c.text.slice(c.bodyLen ?? 0);
+    c.text = c.bodyLen ? `${c.heading}${rest}` : [c.heading, rest].filter(Boolean).join(' ');
+    c.sectionTitle = `Пункт ${c.id}`;
+  }
+
   // Под одним пунктом бывает два буквенных перечня подряд, из-за чего "9.3.а" встречается дважды.
   // Ссылка на источник должна быть однозначной, поэтому повтор получает суффикс вхождения.
   const used = new Map<string, number>();
   return clauses
+    .map(({ heading: _h, bodyLen: _b, ...c }) => c)
     .filter((c) => c.text.trim().length > 0)
     .map((c) => {
       const seen = used.get(c.id) ?? 0;
       used.set(c.id, seen + 1);
       return seen === 0 ? c : { ...c, id: `${c.id}#${seen + 1}` };
     });
+}
+
+/** Столбец с наименованием подразделения — признак строки заголовка таблицы оргструктуры/штатного расписания. */
+export const UNIT_COLUMN = /подразделени|структурн|наименование|департамент|отдел|управлени/iu;
+
+/**
+ * Таблица Excel (оргструктура, штатное расписание) → пункты-строки. Адрес пункта — «лист, стр. N»,
+ * текст — ячейки строки через « | », а в cells — значения по заголовкам столбцов для разбора состава.
+ */
+export function parseTable(sheets: TableSheet[], side: DocSide, docName: string): ParsedClause[] {
+  const out: ParsedClause[] = [];
+  sheets.forEach(({ sheet, rows }, si) => {
+    const prefix = sheets.length > 1 ? `${sheet}, ` : '';
+    const hi = rows.slice(0, 10).findIndex((r) => r.cells.filter(Boolean).length >= 2 && r.cells.some((c) => UNIT_COLUMN.test(c)));
+    const header = hi >= 0 ? rows[hi].cells : undefined;
+    // Объединённые ячейки: наименование подразделения указано в первой строке группы — протягиваем вниз.
+    const carry: string[] = [];
+    rows.forEach((r, i) => {
+      if (header && i <= hi) return;
+      const text = r.cells.filter(Boolean).join(' | ');
+      if (!text) return;
+      let cells: Record<string, string> | undefined;
+      if (header) {
+        const row: Record<string, string> = {};
+        header.forEach((h, k) => {
+          const v = r.cells[k] || (UNIT_COLUMN.test(h) ? carry[k] : '') || '';
+          if (r.cells[k]) carry[k] = r.cells[k];
+          if (h && v) row[h] = v;
+        });
+        cells = row;
+      }
+      out.push({ id: `${prefix}стр. ${r.row}`, section: String(si + 1), sectionTitle: `Таблица «${sheet}»`, text, side, docName, cells });
+    });
+  });
+  return out;
 }
 
 /** Публичная форма пункта — без внутренних полей. */

@@ -8,6 +8,7 @@
 bun install
 bun run dev            # http://localhost:3000 → /dashboard/orgdiff
 bun run analyze:demo   # пайплайн на тестовом комплекте без сервера
+bun scripts/analyze-files.ts --before a.pdf --after b.docx --after c.xlsx   # свой комплект (docx/pdf/xlsx/txt)
 bun run eval           # проверка по эталону data/control/GOLD.md + контрольный комплект (16 проверок)
 bun run typecheck && bun run lint
 ```
