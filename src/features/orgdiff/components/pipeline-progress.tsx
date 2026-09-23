@@ -1,0 +1,101 @@
+'use client';
+
+import { Icons } from '@/components/icons';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
+import { EXPECTED_TRACE_STEPS } from '../constants';
+import type { RunStatus } from '../hooks/use-analysis-run';
+import type { TraceStep } from '../types';
+
+interface PipelineProgressProps {
+  status: RunStatus;
+  trace: TraceStep[];
+  error?: string;
+}
+
+const STATUS_TEXT: Record<RunStatus, string> = {
+  idle: '',
+  running: 'Агент работает — шаги появляются по мере выполнения',
+  done: 'Анализ завершён',
+  error: 'Анализ остановлен'
+};
+
+export function PipelineProgress({ status, trace, error }: PipelineProgressProps) {
+  const percent = getPercent(status, trace);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Ход анализа</CardTitle>
+        <CardDescription>{STATUS_TEXT[status]}</CardDescription>
+      </CardHeader>
+      <CardContent className='flex flex-col gap-4'>
+        <Progress value={percent} aria-label='Прогресс анализа' />
+        <ol className='flex flex-col gap-1.5'>
+          {trace.map((step, index) => (
+            <TraceStepItem key={step.id} index={index} step={step} />
+          ))}
+          {status === 'running' && trace.length === 0 ? (
+            <li className='text-muted-foreground flex items-center gap-2 text-sm'>
+              <Icons.spinner className='size-4 animate-spin' aria-hidden='true' />
+              Отправляем документы…
+            </li>
+          ) : null}
+        </ol>
+        {error ? (
+          <p role='alert' className='text-destructive text-sm'>
+            {error}
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TraceStepItem({ index, step }: { index: number; step: TraceStep }) {
+  const seconds =
+    step.finishedAt !== undefined ? ((step.finishedAt - step.startedAt) / 1000).toFixed(1) : null;
+
+  return (
+    <li
+      aria-current={step.status === 'running' ? 'step' : undefined}
+      className={cn(
+        'flex items-start gap-3 rounded-md px-2 py-1.5',
+        step.status === 'running' && 'bg-primary/5',
+        step.status === 'error' && 'bg-destructive/5'
+      )}
+    >
+      <StepIcon status={step.status} />
+      <div className='min-w-0 flex-1'>
+        <p className='text-sm font-medium'>
+          {index + 1}. {step.label}
+        </p>
+        {step.detail ? <p className='text-muted-foreground text-xs'>{step.detail}</p> : null}
+      </div>
+      {seconds ? (
+        <span className='text-muted-foreground shrink-0 text-xs tabular-nums'>{seconds} с</span>
+      ) : null}
+    </li>
+  );
+}
+
+function StepIcon({ status }: { status: TraceStep['status'] }) {
+  const className = 'mt-0.5 size-4 shrink-0';
+  if (status === 'done') {
+    return <Icons.circleCheck className={cn(className, 'text-primary')} aria-label='готово' />;
+  }
+  if (status === 'running') {
+    return <Icons.spinner className={cn(className, 'animate-spin')} aria-label='выполняется' />;
+  }
+  if (status === 'error') {
+    return <Icons.circleX className={cn(className, 'text-destructive')} aria-label='ошибка' />;
+  }
+  return <Icons.minus className={cn(className, 'text-muted-foreground')} aria-label='пропущен' />;
+}
+
+function getPercent(status: RunStatus, trace: TraceStep[]): number {
+  if (status === 'done') return 100;
+  const finished = trace.filter((step) => step.status !== 'running').length;
+  return Math.min(95, Math.round((finished / EXPECTED_TRACE_STEPS) * 100));
+}
