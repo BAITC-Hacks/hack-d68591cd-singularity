@@ -553,6 +553,29 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     });
   }
 
+  // Преобразование: функции упразднённого подразделения в основном ушли во вновь созданные.
+  for (const r of units.filter((u) => u.status === 'removed')) {
+    const out = flows.filter((f) => f.from === r.id && f.kind === 'transferred');
+    const total = out.reduce((s, f) => s + f.functionCount, 0);
+    const toCreated = out.filter(
+      (f) => units.find((u) => u.id === f.to)?.status === 'created' && f.functionCount / (total || 1) >= 0.25
+    );
+    if (!toCreated.length) continue;
+    const names = toCreated.map((f) => {
+      const u = units.find((x) => x.id === f.to)!;
+      return `${u.abbr ?? u.name} (${f.functionCount})`;
+    });
+    raw.push({
+      kind: 'unit_reorganized',
+      severity: 'medium',
+      title: `Признаки преобразования: ${r.abbr ?? r.name} → ${toCreated.map((f) => units.find((x) => x.id === f.to)!.abbr ?? f.to).join(', ')}`,
+      detail: `Функции «${r.name}» перешли во вновь созданные подразделения: ${names.join(', ')} из ${total} переданных функций.`,
+      unitIds: [r.id, ...toCreated.map((f) => f.to)],
+      evidence: [...r.evidence.slice(0, 1), ...toCreated.flatMap((f) => f.evidence.slice(0, 2))],
+      confidence: 0.85
+    });
+  }
+
   for (const m of matchRows) {
     if (!m.fn || (m.status !== 'lost' && m.status !== 'narrowed')) continue;
     const holders = m.fn.holders.map((h) => unitId(h.key));
