@@ -18,6 +18,23 @@ export interface ParsedClause extends Clause {
 const SECTION_RE = /^(\d{1,2})\.\s+(.+)$/;
 /** "3.4." / "2.3.1." — нумерованный пункт. */
 const CLAUSE_RE = /^(\d{1,2}(?:\.\d{1,3})+)\.?\s*(.*)$/;
+/** Раздел с римским номером или словом: «II. Цели», «Раздел III. Права», «ГЛАВА 2», «Глава IV». */
+const ROMAN_SECTION_RE = /^(?:(?:раздел|глава)\s+([IVXLCІХС]{1,6}|\d{1,2})\.?(?:\s+(.*))?|([IVXLCІХС]{1,6})\.\s+(\S.*))$/iu;
+/** Пункт до первого заголовка раздела: «1.1. Текст» — только с точкой и текстом, чтобы не ловить даты шапки. */
+const STRICT_CLAUSE_RE = /^\d{1,2}(?:\.\d{1,3})+\.\s+\p{L}/u;
+
+/** Римское число → арабское (с кириллическими двойниками І, Х, С). */
+function romanToInt(raw: string): number {
+  const r = raw.toUpperCase().replace(/І/g, 'I').replace(/Х/g, 'X').replace(/С/g, 'C');
+  const v: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100 };
+  let n = 0;
+  for (let i = 0; i < r.length; i++) {
+    const a = v[r[i]] ?? 0;
+    const b = v[r[i + 1]] ?? 0;
+    n += a < b ? -a : a;
+  }
+  return n;
+}
 /** "а." / "б)" — буквенный подпункт внутри последнего пункта. */
 const LETTER_RE = /^([а-яё])[.)]\s+(.+)$/i;
 /** "– текст" / "- текст" — маркированный элемент перечня. */
@@ -99,11 +116,38 @@ export function parseClauses(raw: string, side: DocSide, docName: string): Parse
 
   const parentOf = (id: string) => (id.includes('.') ? id.slice(0, id.lastIndexOf('.')) : undefined);
 
+  // Документ с римскими разделами: арабские «1.», «2.» внутри — это пункты раздела, а не новые разделы.
+  let romanMode = false;
+
   for (const line of lines) {
+    const romanM = line.match(ROMAN_SECTION_RE);
+    if (romanM) {
+      const token = romanM[1] ?? romanM[3];
+      const num = String(/^\d+$/.test(token) ? Number(token) : romanToInt(token));
+      const titleText = (romanM[2] ?? romanM[4] ?? '').trim();
+      const isToc = /\s\d+$/.test(titleText) && titleText.toUpperCase() === titleText;
+      if (num !== '0' && !isToc && !seenSections.has(num)) {
+        romanMode = true;
+        seenSections.add(num);
+        push();
+        section = num;
+        sectionTitle = (titleText || `Раздел ${num}`).replace(/[.:]$/, '').trim();
+        roleHint = undefined;
+        continue;
+      }
+    }
+
     const clauseM = line.match(CLAUSE_RE);
+    // Пункт «1.1. Текст» до первого заголовка раздела — документ без заголовков разделов.
+    if (clauseM && section === '0' && STRICT_CLAUSE_RE.test(line)) {
+      section = clauseM[1].split('.')[0];
+      seenSections.add(section);
+      sectionTitle = `Раздел ${section}`;
+    }
     if (clauseM && section !== '0') {
       push();
-      const id = clauseM[1];
+      // В римском разделе нумерация пунктов может начинаться заново («1.1» внутри «II») — добавляем номер раздела.
+      const id = romanMode && clauseM[1].split('.')[0] !== section ? `${section}.${clauseM[1]}` : clauseM[1];
       const sec = id.split('.')[0];
       if (sec !== section && !seenSections.has(sec)) {
         // Раздел без заголовка в тексте (есть только в оглавлении) — берём название оттуда.
@@ -118,6 +162,13 @@ export function parseClauses(raw: string, side: DocSide, docName: string): Parse
     }
 
     const sectionM = line.match(SECTION_RE);
+    // Арабский «N. текст» внутри римского раздела — пункт этого раздела.
+    if (sectionM && romanMode && section !== '0') {
+      push();
+      const id = `${section}.${sectionM[1]}`;
+      current = { id, section, sectionTitle, text: sectionM[2], side, docName, parentId: section, roleHint };
+      continue;
+    }
     if (sectionM) {
       const isToc = /\s\d+$/.test(sectionM[2]) && sectionM[2].toUpperCase() === sectionM[2];
       if (!isToc && !seenSections.has(sectionM[1])) {
