@@ -197,6 +197,15 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
 
   // 6. LLM: сопоставление изменённых функций
   const afterRef = new Map(afterAll.map((f) => [f.ref, f]));
+  const beforeRef = new Map(fns.before.map((f) => [f.ref, f]));
+  // Внутренние ссылки промптов («A118», «B85») → номера пунктов, понятные пользователю.
+  const humanize = (text: string) =>
+    text.replace(/(?<![\p{L}\d])([AB])(\d+)(?![\p{L}\d])/gu, (m, side: string, n: string) => {
+      const f = (side === 'A' ? afterRef : beforeRef).get(`${side}${n}`);
+      if (!f) return m;
+      const short = meta.get(`${f.side}:${f.clause.docName}`)?.short ?? (f.side === 'before' ? 'до' : 'после');
+      return `п. ${f.clause.id} (${short})`;
+    });
   const verdicts = await step(
     'match',
     'ИИ-сопоставление изменённых функций',
@@ -320,7 +329,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
   const assembled = await step(
     'assemble',
     'Проверка цитат и сборка выводов',
-    async () => assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef }),
+    async () => assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef, humanize }),
     (r) => `выводов: ${r.findings.length}; отброшено без подтверждённой цитаты: выводов ${r.dropped}, цитат ${r.unverified}`
   );
 
@@ -459,9 +468,15 @@ interface AssembleInput {
   dupFindings: { v: { verdict: string; explanation: string; recommendation: string; confidence: number }; p: { a: Fn; b: Fn } }[];
   coi: { title: string; detail: string; rule: string; holders: string[]; refs: { ref: string; quote: string }[]; severity: 'high' | 'medium' | 'low'; confidence: number; recommendation: string }[];
   afterRef: Map<string, Fn>;
+  humanize: (text: string) => string;
 }
 
-function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef }: AssembleInput) {
+/** Типовые обязанности, которые есть у каждого руководителя: их совпадение — не содержательный дубль. */
+const GENERIC_DUTY =
+  /по всему кругу вопросов|прочих поручений|профессионального уровня|запрашива\p{L}* у Руководителей Общества информаци|в разработке ВНД|в разработке проектов документации/iu;
+
+function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef, humanize }: AssembleInput) {
+  for (const m of matchRows) m.explanation = humanize(m.explanation);
   const clauseOf = (side: DocSide, docName: string, id: string) =>
     parsed[side].find((c) => c.docName === docName && c.id === id);
 
@@ -682,19 +697,21 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
 
   for (const { v, p } of dupFindings) {
     const dup = v.verdict === 'duplication';
+    const generic = GENERIC_DUTY.test(p.a.clause.text) && GENERIC_DUTY.test(p.b.clause.text);
     raw.push({
       kind: dup ? 'function_duplicated' : 'responsibility_overlap',
-      severity: dup ? 'high' : 'medium',
-      title: `${dup ? 'Признаки дублирования' : 'Пересечение зон ответственности'}: ${holderLabel(p.a)} и ${holderLabel(p.b)}`,
-      detail: v.explanation,
+      severity: generic ? 'low' : dup ? 'high' : 'medium',
+      title: `${dup ? 'Признаки дублирования' : 'Пересечение зон ответственности'}: ${holderLabel(p.a)} и ${holderLabel(p.b)} — «${clip(p.a.clause.text, 70)}»`,
+      detail: humanize(v.explanation),
       unitIds: [...new Set([...p.a.holders, ...p.b.holders].map((h) => unitId(h.key)))],
       evidence: [ev(p.a.clause), ev(p.b.clause)],
       pairs: [
         { after: ev(p.a.clause), note: holderLabel(p.a) },
         { after: ev(p.b.clause), note: holderLabel(p.b) }
       ],
-      caveat:
-        p.a.holders.length > 1 || p.b.holders.length > 1
+      caveat: generic
+        ? 'Типовая обязанность руководителя, закреплённая за всеми подразделениями; вероятно, не требует устранения.'
+        : p.a.holders.length > 1 || p.b.holders.length > 1
           ? 'Пункт закреплён сразу за несколькими носителями — распределение обязанностей между ними требует уточнения.'
           : undefined,
       confidence: v.confidence,
@@ -716,7 +733,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
       kind: 'conflict_of_interest',
       severity: c.severity,
       title: c.title,
-      detail: `${c.detail} (правило ${c.rule})`,
+      detail: humanize(`${c.detail} (правило ${c.rule})`),
       unitIds: holderIds,
       evidence,
       pairs: evidence.map((e) => ({ after: e })),
@@ -752,6 +769,9 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
   }
 
   for (const f of raw) {
+    if (f.matchIds) f.matchIds = [...new Set(f.matchIds)];
+    f.title = humanize(f.title);
+    if (f.recommendation) f.recommendation = humanize(f.recommendation);
     const seen = new Set<string>();
     f.evidence = f.evidence.filter((e) => {
       const k = `${e.side}|${e.docName}|${e.clauseId}|${e.quote}`;
