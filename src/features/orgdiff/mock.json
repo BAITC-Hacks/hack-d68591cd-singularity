@@ -20633,101 +20633,541 @@
     ],
     "disclaimer": "Выводы сформированы ИИ-агентом, носят рекомендательный характер и требуют проверки ответственным сотрудником. Каждый вывод сопровождается ссылкой на пункт исходного документа."
   },
+  "compliance": [
+    {
+      "requirementId": "IIA-7.1-BOARD",
+      "jurisdiction": "IIA",
+      "source": "IIA GIAS 2024, Standard 7.1 Organizational Independence (Requirements; Essential Conditions — Board)",
+      "requirement": "Функция внутреннего аудита напрямую подотчётна совету директоров; совет санкционирует назначение и освобождение руководителя внутреннего аудита и участвует в оценке его работы и вознаграждения; подчинённость закреплена в положении о внутреннем аудите.",
+      "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+      "verified": true,
+      "status": "partial",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.5",
+          "quote": "Главный аудитор находится в функциональном подчинении Совета директоров Общества",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.11",
+          "quote": "Совета директоров, который согласовывает кандидатуру на должность Главного аудитора",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.12",
+          "quote": "Президентом Общества по предварительному согласованию с Советом директоров Общества",
+          "verified": true
+        }
+      ],
+      "note": "Подчинённость и участие совета в кадровых решениях закреплены. Участие совета в оценке работы и вознаграждения Главного аудитора в переданных пунктах не установлено."
+    },
+    {
+      "requirementId": "IIA-7.1-NONAUDIT",
+      "jurisdiction": "IIA",
+      "source": "IIA GIAS 2024, Standard 7.1 Organizational Independence (Requirements)",
+      "requirement": "Роли руководителя внутреннего аудита вне аудита (в т.ч. участие в органах управления) описываются в положении вместе с мерами защиты; если такие области подлежат аудиту, гарантии по ним даёт независимый внешний провайдер, подотчётный совету директоров.",
+      "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+      "verified": true,
+      "status": "partial",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "4.4",
+          "quote": "Главный аудитор может участвовать в органах управления подконтрольных Обществ, предусмотрев внедрение надлежащих мер для сохранения независимости и объективности",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "4.4.а",
+          "quote": "информирует о потенциальном конфликте при совмещении в отчетах и плане БВА",
+          "verified": true
+        }
+      ],
+      "note": "Совмещение и отдельные защитные меры описаны. Порядок предоставления гарантий независимым внешним провайдером по областям, подлежащим аудиту, не указан."
+    },
+    {
+      "requirementId": "IIA-6.2-CHARTER",
+      "jurisdiction": "IIA",
+      "source": "IIA GIAS 2024, Standard 6.2 Internal Audit Charter (Requirements; Essential Conditions — Board)",
+      "requirement": "Положение о внутреннем аудите утверждается советом директоров и определяет назначение, мандат и виды услуг, приверженность Стандартам, организационный статус и линии подчинённости.",
+      "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+      "verified": true,
+      "status": "partial",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "6.3.1",
+          "quote": "утверждения Положения о внутреннем аудите, определяющего цели, задачи, полномочия и ограничения внутреннего аудита",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.9",
+          "quote": "БВА регулирует свою деятельность с соблюдением обязательного для исполнения руководства международного Института внутренних аудиторов",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.5",
+          "quote": "Главный аудитор находится в функциональном подчинении Совета директоров Общества",
+          "verified": true
+        }
+      ],
+      "note": "Положение охватывает цели, полномочия, профессиональные ориентиры и подчинённость. Пункт об утверждении приведён в перечне вопросов взаимодействия с комитетом и советом, но однозначно не закрепляет, какой именно орган утверждает Положение."
+    },
+    {
+      "requirementId": "IIA-9.4-PLAN",
+      "jurisdiction": "IIA",
+      "source": "IIA GIAS 2024, Standard 9.4 Internal Audit Plan; Standard 6.3 (Essential Conditions — Board)",
+      "requirement": "План внутреннего аудита строится на документированной, не реже раза в год обновляемой оценке рисков и утверждается советом директоров вместе с бюджетом и планом ресурсов.",
+      "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+      "verified": true,
+      "status": "partial",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "8.1",
+          "quote": "БВА осуществляет деятельность на основе ежегодного Плана работы, утвержденного Советом директоров Общества на полугодовой основе",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "8.6.2",
+          "quote": "использование результатов оценки рисков",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "8.6.5",
+          "quote": "формирование графика работ, ресурсного плана и бюджета затрат БВА",
+          "verified": true
+        }
+      ],
+      "note": "Есть риск-ориентированное планирование и утверждение плана советом. Ежегодное обновление документированной оценки рисков и утверждение советом бюджета и ресурсного плана прямо не закреплены."
+    },
+    {
+      "requirementId": "IIA-6.3-ACCESS",
+      "jurisdiction": "IIA",
+      "source": "IIA GIAS 2024, Standard 6.3 Board and Senior Management Support (Essential Conditions — Board)",
+      "requirement": "Внутреннему аудиту обеспечен неограниченный доступ к данным, документам, информации, работникам и имуществу, необходимым для выполнения мандата.",
+      "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+      "verified": true,
+      "status": "met",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "5.7.1",
+          "quote": "получать беспрепятственный и неограниченный доступ в разумные сроки к любым активам (в том числе служебным помещениям), документам, данным, информационным системам",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "5.7.4",
+          "quote": "в рамках выполнения проверок проводить интервью с должностными лицами и работниками Общества",
+          "verified": true
+        }
+      ],
+      "note": "Закреплён доступ к активам, помещениям, документам, данным и работникам; для режимных объектов и гостайны п. 5.7.1 предусматривает порядок допуска."
+    },
+    {
+      "requirementId": "IIA-2.2-OBJECTIVITY",
+      "jurisdiction": "IIA",
+      "source": "IIA GIAS 2024, Standard 2.1 Individual Objectivity; Standard 2.2 Safeguarding Objectivity",
+      "requirement": "Внутренние аудиторы сохраняют объективность и избегают конфликта интересов: не проверяют деятельность, за которую отвечали в предыдущие 12 месяцев, а переход от консультирования к проверке того же объекта допускается только при подтверждённой объективности.",
+      "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+      "verified": true,
+      "status": "partial",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "2.4.7.в",
+          "quote": "Консультации проводятся по отдельным заданиям Руководителей Общества или уполномоченных ими лиц",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "2.4.7.в",
+          "quote": "сохранения независимости и объективности внутреннего аудита",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "5.7.14",
+          "quote": "информировать Главного аудитора о любых ограничениях полномочий и конфликтах интересов",
+          "verified": true
+        }
+      ],
+      "note": "Предусмотрены сохранение объективности при консультировании и сообщение о конфликтах. Правило предыдущих 12 месяцев и условие проверки объекта после консультирования не установлены."
+    },
+    {
+      "requirementId": "IIA-8.3-QAIP",
+      "jurisdiction": "IIA",
+      "source": "IIA GIAS 2024, Standard 8.3 Quality; Standard 12.1 Internal Quality Assessment",
+      "requirement": "Руководитель внутреннего аудита разрабатывает и поддерживает программу обеспечения и повышения качества, охватывающую все аспекты деятельности и включающую внутренние (постоянный мониторинг, периодические самооценки) и внешние оценки; результаты внутренних оценок докладываются совету директоров не реже раза в год.",
+      "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+      "verified": true,
+      "status": "partial",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "5.5.2",
+          "quote": "организует непрерывный мониторинг качества деятельности внутреннего аудита; организует периодические внутренние и внешние оценки качества всего спектра деятельности внутреннего аудита",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "5.1.10",
+          "quote": "организует контроль качества внутреннего аудита в порядке, предусмотренном настоящим Положением",
+          "verified": true
+        }
+      ],
+      "note": "Программа и её охват обозначены, ответственность Главного аудитора за контроль качества указана. Ежегодная периодичность доклада совету о результатах внутренних оценок не закреплена."
+    },
+    {
+      "requirementId": "IIA-8.4-EQA",
+      "jurisdiction": "IIA",
+      "source": "IIA GIAS 2024, Standard 8.4 External Quality Assessment",
+      "requirement": "Внешняя оценка качества внутреннего аудита проводится не реже одного раза в пять лет квалифицированным независимым оценщиком (или как самооценка с независимым подтверждением); план внешней оценки обсуждается с советом директоров.",
+      "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+      "verified": true,
+      "status": "partial",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "5.5.2",
+          "quote": "организует периодические внутренние и внешние оценки качества всего спектра деятельности внутреннего аудита",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "5.1.10",
+          "quote": "назначает работников, ответственных за взаимодействие с внешним экспертом (группой экспертов)",
+          "verified": true
+        }
+      ],
+      "note": "Внешние оценки предусмотрены, но пятилетний срок, требования к независимости и квалификации оценщика и обсуждение плана оценки с советом не указаны."
+    },
+    {
+      "requirementId": "IIA-8.1-REPORTING",
+      "jurisdiction": "IIA",
+      "source": "IIA GIAS 2024, Standard 8.1 Board Interaction",
+      "requirement": "Руководитель внутреннего аудита отчитывается перед советом директоров: план и бюджет и их существенные изменения, угрозы независимости, результаты работы, результаты программы обеспечения качества.",
+      "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+      "verified": true,
+      "status": "partial",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "6.3.3",
+          "quote": "получения информации от Главного аудитора: о ходе выполнения плана работ внутреннего аудита и об осуществлении внутреннего аудита",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "6.3.4",
+          "quote": "рассмотрения существенных ограничений полномочий внутреннего аудита или иных ограничений",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "2.4.20",
+          "quote": "подготовка для Совета директоров, Комитета по аудиту Совета директоров, Ревизионной комиссии и Президента Общества отчета об итогах работы БВА",
+          "verified": true
+        }
+      ],
+      "note": "Отчётность о работе и ограничениях предусмотрена. Представление совету бюджета, его существенных изменений и всех результатов программы качества из переданного текста однозначно не следует."
+    },
+    {
+      "requirementId": "IIA-15.2-FOLLOWUP",
+      "jurisdiction": "IIA",
+      "source": "IIA GIAS 2024, Standard 15.2 Confirming the Implementation of Recommendations or Action Plans",
+      "requirement": "Внутренний аудит по установленной методологии подтверждает выполнение рекомендаций и планов действий руководства: запрашивает ход выполнения, проводит последующие проверки, ведёт учёт статусов.",
+      "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+      "verified": true,
+      "status": "partial",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "2.4.9",
+          "quote": "осуществление мониторинга выполнения в Обществе планов мероприятий по устранению недостатков, нарушений и совершенствованию СВК",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "5.3.7",
+          "quote": "обеспечивают и совершенствуют работу системы мониторинга действий (корректирующих мер) Руководителей Общества",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "8.7.5",
+          "quote": "перечня неисправленных недостатков и предложений работников БВА, с целью выявления областей, требующих повторной проверки",
+          "verified": true
+        }
+      ],
+      "note": "Мониторинг корректирующих действий и учёт неисправленных недостатков отражены. Полная методология подтверждения выполнения, включая запросы о ходе исполнения и последующие проверки, не раскрыта."
+    },
+    {
+      "requirementId": "KZ-AO-61-3",
+      "jurisdiction": "KZ",
+      "source": "Закон РК «Об акционерных обществах» № 415-II, ст. 61 п. 3",
+      "requirement": "Служба внутреннего аудита непосредственно подчиняется совету директоров и отчитывается перед ним о своей работе.",
+      "url": "https://adilet.zan.kz/rus/docs/Z030000415_",
+      "verified": true,
+      "status": "partial",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.3",
+          "quote": "Деятельность БВА контролируется непосредственно Советом директоров Общества",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.5",
+          "quote": "Главный аудитор находится в функциональном подчинении Совета директоров Общества",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "2.4.20",
+          "quote": "подготовка для Совета директоров, Комитета по аудиту Совета директоров, Ревизионной комиссии и Президента Общества отчета об итогах работы БВА",
+          "verified": true
+        }
+      ],
+      "note": "Функциональное подчинение и отчёт совету предусмотрены, но для Главного аудитора также установлена административная подотчётность Президенту (п. 1.6). Применимость требования KZ требует подтверждения статуса общества как АО-резидента РК."
+    },
+    {
+      "requirementId": "KZ-AO-61-2",
+      "jurisdiction": "KZ",
+      "source": "Закон РК «Об акционерных обществах» № 415-II, ст. 61 п. 2",
+      "requirement": "Работники службы внутреннего аудита не могут быть избраны в состав совета директоров и исполнительного органа общества.",
+      "url": "https://adilet.zan.kz/rus/docs/Z030000415_",
+      "verified": true,
+      "status": "no_evidence",
+      "evidence": [],
+      "note": "Запрет на избрание работников БВА в совет директоров или исполнительный орган в переданных пунктах не обнаружен. Применимость требования KZ требует подтверждения статуса общества."
+    },
+    {
+      "requirementId": "KZ-AO-53-2-10",
+      "jurisdiction": "KZ",
+      "source": "Закон РК «Об акционерных обществах» № 415-II, ст. 53 п. 2 пп. 10",
+      "requirement": "К исключительной компетенции совета директоров относятся: численность и срок полномочий службы внутреннего аудита, назначение и досрочное прекращение полномочий её руководителя и работников, порядок работы, размер и условия оплаты труда и премирования.",
+      "url": "https://adilet.zan.kz/rus/docs/Z030000415_",
+      "verified": true,
+      "status": "not_met",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "3.1",
+          "quote": "Штатная численность подразделений, входящих в БВА Общества, определяется штатным расписанием, которое утверждается Президентом Общества",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.11",
+          "quote": "Совета директоров, который согласовывает кандидатуру на должность Главного аудитора",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.12",
+          "quote": "Главный аудитор освобождается от должности по инициативе Общества Президентом Общества по предварительному согласованию с Советом директоров Общества",
+          "verified": true
+        }
+      ],
+      "note": "По прямо урегулированным вопросам решения отнесены не исключительно к совету: штатное расписание утверждает Президент, совет согласовывает кандидатуру и освобождение. Признаки несоответствия требуют проверки только при применимости требования KZ."
+    },
+    {
+      "requirementId": "KZ-AO-53-1",
+      "jurisdiction": "KZ",
+      "source": "Закон РК «Об акционерных обществах» № 415-II, ст. 53-1 п. 2, 3",
+      "requirement": "Вопросы внутреннего аудита рассматривает отдельный комитет совета директоров, состоящий исключительно из членов совета директоров, во главе с независимым директором.",
+      "url": "https://adilet.zan.kz/rus/docs/Z030000415_",
+      "verified": true,
+      "status": "no_evidence",
+      "evidence": [],
+      "note": "Комитет по аудиту упоминается, однако его состав и статус председателя в переданных пунктах не определены. Применимость требования KZ и документы о комитете требуют отдельной проверки."
+    },
+    {
+      "requirementId": "RU-208FZ-87.1-2",
+      "jurisdiction": "RU",
+      "source": "Федеральный закон № 208-ФЗ «Об акционерных обществах», ст. 87.1 п. 2 (для публичных АО РФ)",
+      "requirement": "В публичном обществе осуществляется внутренний аудит; совет директоров утверждает внутренние документы о его организации, назначает руководителя (ответственное лицо) и утверждает условия договора с ним.",
+      "url": "https://www.consultant.ru/document/cons_doc_LAW_8743/957031dab97d15c7919f58051356601a9e33d217/",
+      "verified": true,
+      "status": "not_met",
+      "evidence": [
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.2",
+          "quote": "БВА является функциональным блоком, не зависимым по отношению к иным подразделениям Общества и осуществляющим функции внутреннего аудита",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.11",
+          "quote": "Совета директоров, который согласовывает кандидатуру на должность Главного аудитора",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "1.13",
+          "quote": "Трудовой договор с Главным аудитором подписывается Президентом Общества",
+          "verified": true
+        },
+        {
+          "side": "after",
+          "docName": "after_polozhenie_red9.docx",
+          "clauseId": "6.3.1",
+          "quote": "утверждения Положения о внутреннем аудите, определяющего цели, задачи, полномочия и ограничения внутреннего аудита",
+          "verified": true
+        }
+      ],
+      "note": "Внутренний аудит действует, однако совету прямо отведено согласование кандидатуры, а не назначение руководителя; утверждение советом условий договора не подтверждено. Признаки несоответствия требуют проверки статуса публичного АО РФ и иных документов."
+    }
+  ],
   "trace": [
     {
       "id": "parse",
       "label": "Чтение документов и разбор на пункты",
       "status": "done",
-      "startedAt": 1790160868791,
-      "finishedAt": 1790160868962,
+      "startedAt": 1790161270506,
+      "finishedAt": 1790161270583,
       "detail": "до: 441 пунктов, после: 442 пунктов"
     },
     {
       "id": "structure",
       "label": "Определение состава подразделений",
       "status": "done",
-      "startedAt": 1790160868962,
-      "finishedAt": 1790160868972,
+      "startedAt": 1790161270583,
+      "finishedAt": 1790161270589,
       "detail": "до: ДНМ, ДККМ, Главный аудитор, Директор направления внутреннего аудита; после: ДИТААД, ДОА, ДНМ, ДККМ, Главный аудитор"
     },
     {
       "id": "functions",
       "label": "Извлечение функций и их носителей",
       "status": "done",
-      "startedAt": 1790160868972,
-      "finishedAt": 1790160868982,
+      "startedAt": 1790161270589,
+      "finishedAt": 1790161270595,
       "detail": "до: 377, после: 371"
     },
     {
       "id": "align",
       "label": "Выравнивание неизменённых пунктов",
       "status": "done",
-      "startedAt": 1790160868982,
-      "finishedAt": 1790160868987,
+      "startedAt": 1790161270595,
+      "finishedAt": 1790161270599,
       "detail": "совпали дословно: 320 из 377; к сопоставлению ИИ: 57"
     },
     {
       "id": "embed",
       "label": "Семантические векторы пунктов",
       "status": "done",
-      "startedAt": 1790160868990,
-      "finishedAt": 1790160869007,
+      "startedAt": 1790161270601,
+      "finishedAt": 1790161270608,
       "detail": "492 векторов"
     },
     {
       "id": "match",
       "label": "ИИ-сопоставление изменённых функций",
       "status": "done",
-      "startedAt": 1790160869007,
-      "finishedAt": 1790160869425,
+      "startedAt": 1790161270608,
+      "finishedAt": 1790161270794,
       "detail": "сохранено: 34, сужено: 15, расширено: 4, кандидаты в потерю: 4"
     },
     {
       "id": "recheck",
       "label": "Самопроверка потерь по всему документу",
       "status": "done",
-      "startedAt": 1790160869425,
-      "finishedAt": 1790160869458,
+      "startedAt": 1790161270794,
+      "finishedAt": 1790161270808,
       "detail": "проверено: 4, пересмотрено: 4"
     },
     {
       "id": "duplicates",
       "label": "Поиск дублирования и пересечения функций",
       "status": "done",
-      "startedAt": 1790160869460,
-      "finishedAt": 1790160869462,
+      "startedAt": 1790161270808,
+      "finishedAt": 1790161270809,
       "detail": "найдено: 6"
     },
     {
       "id": "conflicts",
       "label": "Поиск конфликта интересов (каталог правил IIA/SoD)",
       "status": "done",
-      "startedAt": 1790160869462,
-      "finishedAt": 1790160869464,
+      "startedAt": 1790161270809,
+      "finishedAt": 1790161270810,
       "detail": "кандидатов: 4"
     },
     {
       "id": "redistribute",
       "label": "Рекомендации по перераспределению утраченных функций",
       "status": "done",
-      "startedAt": 1790160869465,
-      "finishedAt": 1790160869466,
+      "startedAt": 1790161270810,
+      "finishedAt": 1790161270811,
       "detail": "утраченных функций: 3, рекомендаций: 3"
     },
     {
       "id": "assemble",
       "label": "Проверка цитат и сборка выводов",
       "status": "done",
-      "startedAt": 1790160869466,
-      "finishedAt": 1790160869486,
+      "startedAt": 1790161270811,
+      "finishedAt": 1790161270823,
       "detail": "выводов: 36; отброшено без подтверждённой цитаты: выводов 0, цитат 0"
     },
     {
       "id": "conclusion",
       "label": "Итоговое аналитическое заключение",
       "status": "done",
-      "startedAt": 1790160869486,
-      "finishedAt": 1790160869488
+      "startedAt": 1790161270823,
+      "finishedAt": 1790161270824
+    },
+    {
+      "id": "compliance",
+      "label": "Сверка с внешними требованиями (IIA, Закон РК «Об АО»)",
+      "status": "done",
+      "startedAt": 1790161270824,
+      "finishedAt": 1790161270826,
+      "detail": "требований: 15; выполнено 1, частично 10, не выполнено 2, противоречит 0, не найдено 2"
     }
   ],
   "stats": {
@@ -20742,9 +21182,9 @@
   },
   "meta": {
     "model": "gpt-6-sol",
-    "generatedAt": "2026-09-23T10:54:29.489Z",
+    "generatedAt": "2026-09-23T11:01:10.826Z",
     "resultId": "4e40dc7a25e18040",
-    "durationMs": 700,
+    "durationMs": 321,
     "fromCache": true
   }
 }
