@@ -4,22 +4,22 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import { useResultJobId } from '../../api/queries';
-import { canDownloadReport, downloadReport, type ReportFormat } from '../../api/service';
+import { downloadReport, type ReportFormat } from '../../api/service';
+import type { FindingReviews } from '../../hooks/use-finding-reviews';
+import type { AnalysisResult } from '../../types';
 
 interface ConclusionActionsProps {
+  result: AnalysisResult;
+  reviews: FindingReviews;
   markdown: string;
 }
 
-export function ConclusionActions({ markdown }: ConclusionActionsProps) {
-  const jobId = useResultJobId();
-  const canDownload = canDownloadReport(jobId);
-
+export function ConclusionActions({ result, reviews, markdown }: ConclusionActionsProps) {
   const download = useMutation({
     mutationFn: async (format: ReportFormat) => {
-      if (!canDownloadReport(jobId)) throw new Error('Файл доступен только для анализа на сервере');
-      const blob = await downloadReport(jobId, format);
-      saveBlob(blob, `orgdiff-zaklyuchenie.${format}`);
+      const blob = await downloadReport(result, reviews, format);
+      const suffix = result.meta.resultId ? `-${result.meta.resultId}` : '';
+      saveBlob(blob, `orgdiff-zaklyuchenie${suffix}.${format}`);
     },
     onError: (error) => toast.error(`Файл не сформирован: ${error.message}`)
   });
@@ -34,8 +34,8 @@ export function ConclusionActions({ markdown }: ConclusionActionsProps) {
   };
 
   return (
-    <div className='flex flex-col items-end gap-1'>
-      <div className='flex flex-wrap justify-end gap-2'>
+    <div className='flex flex-col items-start gap-1 sm:items-end'>
+      <div className='flex flex-wrap gap-2 sm:justify-end'>
         <Button variant='outline' size='sm' onClick={copy}>
           <Icons.forms />
           Скопировать
@@ -45,7 +45,7 @@ export function ConclusionActions({ markdown }: ConclusionActionsProps) {
             key={format}
             variant={format === 'docx' ? 'default' : 'outline'}
             size='sm'
-            disabled={!canDownload || download.isPending}
+            disabled={download.isPending}
             onClick={() => download.mutate(format)}
           >
             {download.isPending && download.variables === format ? (
@@ -58,9 +58,7 @@ export function ConclusionActions({ markdown }: ConclusionActionsProps) {
         ))}
       </div>
       <p className='text-muted-foreground text-xs'>
-        {canDownload
-          ? 'Файл формирует сервер; отметки проверки в него пока не попадают — они есть в «Скопировать»'
-          : 'Скачивание доступно после анализа на сервере (не в демо-режиме)'}
+        В файле учтены решения по выводам: отклонённые — в приложении
       </p>
     </div>
   );

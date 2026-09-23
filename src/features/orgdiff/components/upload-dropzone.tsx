@@ -29,8 +29,15 @@ export function UploadDropzone({ side, files, disabled, onFilesChange }: UploadD
   const onDrop = (accepted: File[], rejected: FileRejection[]) => {
     rejected.forEach(notifyRejection);
 
+    const empty = accepted.filter((file) => file.size === 0);
+    empty.forEach((file) => toast.error(`${file.name}: файл пустой — в нём нечего анализировать`));
+
     const known = new Set(files.map(fileKey));
-    const fresh = accepted.filter((file) => !known.has(fileKey(file)));
+    const duplicates = accepted.filter((file) => file.size > 0 && known.has(fileKey(file)));
+    if (duplicates.length > 0) {
+      toast.info(`Уже добавлено: ${duplicates.map((file) => file.name).join(', ')}`);
+    }
+    const fresh = accepted.filter((file) => file.size > 0 && !known.has(fileKey(file)));
     const room = MAX_FILES_PER_SIDE - files.length;
 
     if (fresh.length > room) {

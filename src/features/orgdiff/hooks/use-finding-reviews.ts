@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useSyncExternalStore } from 'react';
+import type { AnalysisResult, FindingReview } from '../types';
 
-/** Решение сотрудника по выводу — локально, на бэкенд не уходит */
-export type FindingReview = 'confirmed' | 'rejected';
+export type { FindingReview };
+/** Решения сотрудника по выводам; уходят на бэкенд только в запросе отчёта */
 export type FindingReviews = Readonly<Record<string, FindingReview>>;
 
 const STORAGE_PREFIX = 'orgdiff:reviews:';
@@ -13,10 +14,12 @@ const memory = new Map<string, FindingReviews>();
 const listeners = new Set<() => void>();
 
 /**
- * Решения по выводам конкретного результата (ключ — meta.generatedAt).
- * Переживают переключение вкладок и перезагрузку; без localStorage — только в памяти.
+ * Решения по выводам конкретного результата. Ключ — meta.resultId (хеш входных документов),
+ * поэтому решения переживают повторный анализ тех же файлов, перезагрузку и смену вкладок.
+ * Без localStorage — только в памяти.
  */
-export function useFindingReviews(resultKey: string) {
+export function useFindingReviews(result: AnalysisResult) {
+  const resultKey = result.meta.resultId ?? result.meta.generatedAt;
   const reviews = useSyncExternalStore(
     subscribe,
     () => readReviews(resultKey),

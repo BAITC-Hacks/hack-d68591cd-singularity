@@ -1,6 +1,7 @@
 'use client';
 
 import { Icons } from '@/components/icons';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -11,6 +12,8 @@ interface PipelineProgressProps {
   status: RunStatus;
   trace: TraceStep[];
   error?: string;
+  /** Повторить с теми же файлами — показывается при ошибке */
+  onRetry?: () => void;
 }
 
 const STATUS_TEXT: Record<RunStatus, string> = {
@@ -20,7 +23,7 @@ const STATUS_TEXT: Record<RunStatus, string> = {
   error: 'Анализ остановлен'
 };
 
-export function PipelineProgress({ status, trace, error }: PipelineProgressProps) {
+export function PipelineProgress({ status, trace, error, onRetry }: PipelineProgressProps) {
   const percent = getPercent(status, trace);
 
   return (
@@ -43,9 +46,18 @@ export function PipelineProgress({ status, trace, error }: PipelineProgressProps
           ) : null}
         </ol>
         {error ? (
-          <p role='alert' className='text-destructive text-sm'>
-            {error}
-          </p>
+          <div
+            role='alert'
+            className='border-destructive/40 bg-destructive/5 flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between'
+          >
+            <ErrorText error={error} />
+            {onRetry ? (
+              <Button variant='outline' size='sm' className='shrink-0' onClick={onRetry}>
+                <Icons.search />
+                Повторить анализ
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </CardContent>
     </Card>
@@ -105,4 +117,22 @@ function getPercent(status: RunStatus, trace: TraceStep[]): number {
     (step) => step.status === 'done' || step.status === 'skipped'
   ).length;
   return Math.min(95, Math.round((finished / trace.length) * 100));
+}
+
+const GENERIC_PIPELINE_ERROR =
+  'Не удалось прочитать документы. Проверьте, что файлы не повреждены и сохранены в формате .docx, .pdf или .xlsx.';
+
+/**
+ * Сообщения пайплайна по-русски показываем как есть; сырые технические
+ * (например, от парсера docx на английском) — заменяем понятным текстом,
+ * а исходное оставляем мелко для разбора.
+ */
+function ErrorText({ error }: { error: string }) {
+  if (/[а-яё]/i.test(error)) return <p className='text-destructive text-sm'>{error}</p>;
+  return (
+    <div className='flex flex-col gap-1'>
+      <p className='text-destructive text-sm'>{GENERIC_PIPELINE_ERROR}</p>
+      <p className='text-muted-foreground text-xs break-all'>Техническая причина: {error}</p>
+    </div>
+  );
 }

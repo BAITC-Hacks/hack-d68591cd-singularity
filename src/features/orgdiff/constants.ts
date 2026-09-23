@@ -11,6 +11,8 @@ export const MOCK_STEP_MS = 450;
 
 export const ANALYZE_ENDPOINT = '/api/analyze';
 
+export const REPORT_ENDPOINT = '/api/report';
+
 export const ACCEPTED_FILES = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
   'application/pdf': ['.pdf'],

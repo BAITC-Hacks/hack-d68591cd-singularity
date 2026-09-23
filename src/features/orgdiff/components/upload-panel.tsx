@@ -93,7 +93,12 @@ export function UploadPanel({ onShowResults }: UploadPanelProps) {
       </div>
 
       {run.status === 'idle' ? null : (
-        <PipelineProgress status={run.status} trace={run.trace} error={run.error} />
+        <PipelineProgress
+          status={run.status}
+          trace={run.trace}
+          error={run.error}
+          onRetry={missing === null ? () => run.start(files) : undefined}
+        />
       )}
 
       {run.result ? <AnalysisDoneBanner result={run.result} onShowResults={onShowResults} /> : null}

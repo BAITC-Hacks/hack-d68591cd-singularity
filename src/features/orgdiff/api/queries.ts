@@ -6,8 +6,6 @@ import { getAnalysisJob } from './service';
 export const orgdiffKeys = {
   all: ['orgdiff'] as const,
   result: () => [...orgdiffKeys.all, 'result'] as const,
-  /** jobId, из которого получен текущий результат, — для выгрузки отчёта */
-  resultJobId: () => [...orgdiffKeys.all, 'result-job-id'] as const,
   job: (jobId: string | null) => [...orgdiffKeys.all, 'job', jobId] as const
 };
 
@@ -39,14 +37,3 @@ export const analysisJobOptions = (jobId: string | null) =>
     retry: 1,
     staleTime: Infinity
   });
-
-export function useResultJobId(): string | undefined {
-  return useQuery(
-    queryOptions<string>({
-      queryKey: orgdiffKeys.resultJobId(),
-      queryFn: skipToken,
-      staleTime: Infinity,
-      gcTime: Infinity
-    })
-  ).data;
-}
