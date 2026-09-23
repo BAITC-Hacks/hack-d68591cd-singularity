@@ -108,7 +108,7 @@ export interface FunctionMatch {
   status: MatchStatus;
   /** UnitFunction.id; нет у added */
   beforeId?: string;
-  /** UnitFunction.id пунктов «после», которые покрывают функцию; пусто у lost */
+  /** UnitFunction.id пунктов «после», которые покрывают функцию; у lost — пункты лишь частичного покрытия (обычно пусто) */
   afterIds: string[];
   /** Почему так решено — одно-два предложения */
   explanation: string;

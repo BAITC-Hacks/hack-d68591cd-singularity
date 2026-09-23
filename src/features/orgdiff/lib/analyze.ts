@@ -147,9 +147,11 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
   );
 
   const score = (a: Fn, b: Fn) => cosine(vectors.get(a.uid)!, vectors.get(b.uid)!) + 0.3 * jaccard(a.clause.text, b.clause.text);
+  // Кандидат того же носителя получает бонус: типовые обязанности есть у всех руководителей,
+  // и без бонуса модель может сопоставить функцию ДНМ с такой же строкой другого департамента.
   const topK = (f: Fn, pool: Fn[], k: number) =>
     pool
-      .map((c) => ({ c, s: score(f, c) }))
+      .map((c) => ({ c, s: score(f, c) + (sameHolders(f, c) ? 0.08 : 0) }))
       .sort((x, y) => y.s - x.s)
       .slice(0, k)
       .map((x) => x.c);
@@ -179,19 +181,21 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
         const v = verdictByRef.get(c.ref);
         if (!v || c.verdict === 'not_covered') continue;
         revised++;
-        v.verdict = c.verdict === 'covered' ? 'same' : 'narrowed';
+        // Частичное покрытие общими нормами не снимает вывод о потере: конкретное право/обязанность исчезли.
+        v.verdict = c.verdict === 'covered' ? 'same' : 'lost';
+        v.partialLoss = c.verdict === 'partially';
         v.afterRefs = c.afterRefs;
         v.explanation = `Перепроверка: ${c.explanation}`;
         v.confidence = c.confidence;
       }
       return revised;
     },
-    (r) => `проверено: ${lostFns.length}, снято ложных потерь: ${r}`
+    (r) => `проверено: ${lostFns.length}, пересмотрено: ${r}`
   );
 
   // 8. Сборка таблицы сопоставления функций
   const beforeFnById = new Map(fns.before.map((f) => [f.uid, f]));
-  const matchRows: { fn?: Fn; after: Fn[]; status: MatchStatus; explanation: string; confidence: number; lostPart?: string }[] = [];
+  const matchRows: MatchRow[] = [];
   const coveredAfter = new Set<string>();
   for (const f of fns.before) {
     const ex = exact.get(f.uid);
@@ -218,7 +222,8 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
       status: statusOf(v, f, after),
       explanation: v?.explanation ?? 'Нет решения модели.',
       confidence: v?.confidence ?? 0.3,
-      lostPart: v?.lostPart
+      lostPart: v?.lostPart,
+      partialLoss: v?.partialLoss
     });
   }
   for (const a of fns.after) {
@@ -333,6 +338,16 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
 
 // ---------------------------------------------------------------------------------------------
 
+interface MatchRow {
+  fn?: Fn;
+  after: Fn[];
+  status: MatchStatus;
+  explanation: string;
+  confidence: number;
+  lostPart?: string;
+  partialLoss?: boolean;
+}
+
 function statusOf(v: MatchVerdict | undefined, f: Fn, after: Fn[]): MatchStatus {
   if (!v || v.verdict === 'lost' || !after.length) return 'lost';
   if (v.verdict === 'narrowed') return 'narrowed';
@@ -397,7 +412,7 @@ interface AssembleInput {
   parsed: Record<DocSide, ParsedClause[]>;
   structure: Record<DocSide, UnitDef[]>;
   fns: Record<DocSide, Fn[]>;
-  matchRows: { fn?: Fn; after: Fn[]; status: MatchStatus; explanation: string; confidence: number; lostPart?: string }[];
+  matchRows: MatchRow[];
   dupFindings: { v: { verdict: string; explanation: string; recommendation: string; confidence: number }; p: { a: Fn; b: Fn } }[];
   coi: { title: string; detail: string; rule: string; holders: string[]; refs: { ref: string; quote: string }[]; severity: 'high' | 'medium' | 'low'; confidence: number; recommendation: string }[];
   afterRef: Map<string, Fn>;
@@ -474,7 +489,10 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
 
     const receivedFrom = flows.filter((f) => f.to === unitId(key) && f.kind === 'transferred');
     const gaveTo = flows.filter((f) => f.from === unitId(key) && f.kind === 'transferred');
-    const label = (id: string) => [...structure.before, ...structure.after].find((x) => unitId(x.key) === id)?.abbr ?? id.replace(/^u-/, '');
+    const label = (id: string) => {
+      const x = [...structure.before, ...structure.after].find((y) => unitId(y.key) === id);
+      return x ? (x.abbr ?? x.name) : id.replace(/^u-/, '');
+    };
     const parts: string[] = [];
     if (status === 'created') parts.push('Создано');
     if (status === 'removed') parts.push(u.kind === 'position' ? 'Должность упразднена' : 'Упразднено');
@@ -513,12 +531,12 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
   for (const u of units) {
     if (u.status === 'retained') continue;
     const kind = u.status === 'created' ? 'unit_created' : u.status === 'removed' ? 'unit_removed' : 'unit_reorganized';
-    const noun = u.kind === 'position' ? 'должность' : 'подразделение';
+    const pos = u.kind === 'position';
     const title =
       kind === 'unit_created'
-        ? `Создано ${noun}: ${u.name}${u.abbr ? ` (${u.abbr})` : ''}`
+        ? `${pos ? 'Введена должность' : 'Создано подразделение'}: ${u.name}${u.abbr ? ` (${u.abbr})` : ''}`
         : kind === 'unit_removed'
-          ? `Упразднено ${noun}: ${u.name}`
+          ? `${pos ? 'Упразднена должность' : 'Упразднено подразделение'}: ${u.name}`
           : `Признаки реорганизации: ${u.name}${u.abbr ? ` (${u.abbr})` : ''}`;
     const flowEv = flows
       .filter((f) => f.kind === 'transferred' && (f.from === u.id || f.to === u.id))
@@ -544,16 +562,19 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
         kind: 'function_lost',
         severity: 'high',
         title: `Признаки утраты функции (${who}): «${clip(m.fn.clause.text, 90)}»`,
-        detail: `В новой редакции не найден пункт, покрывающий функцию п. ${m.fn.clause.id} прежней редакции. ${m.explanation}`,
+        detail: m.partialLoss
+          ? `Конкретная функция п. ${m.fn.clause.id} прежней редакции в новой не закреплена; найдено лишь частичное покрытие общими нормами. ${m.explanation}`
+          : `В новой редакции не найден пункт, покрывающий функцию п. ${m.fn.clause.id} прежней редакции. ${m.explanation}`,
         unitIds: holders,
-        evidence: [ev(m.fn.clause)],
+        evidence: [ev(m.fn.clause), ...m.after.slice(0, 2).map((a) => ev(a.clause))],
         confidence: m.confidence,
         recommendation: 'Проверить, должна ли функция сохраниться, и при необходимости закрепить её за профильным подразделением.'
       });
     } else {
       raw.push({
         kind: 'function_narrowed',
-        severity: 'medium',
+        // Выпало одно-два слова («критериев», «и филиалов») — сигнал слабее, чем потеря целого действия.
+        severity: m.lostPart && m.lostPart.length < 30 ? 'low' : 'medium',
         title: `Признаки сужения функции (${who}): п. ${m.fn.clause.id}`,
         detail: `${m.explanation}${m.lostPart ? ` Утраченная часть: «${m.lostPart}».` : ''}`,
         unitIds: [...new Set([...holders, ...m.after.flatMap((a) => a.holders.map((h) => unitId(h.key)))])],
@@ -596,6 +617,14 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
       evidence,
       confidence: c.confidence,
       recommendation: c.recommendation || undefined
+    });
+  }
+
+  for (const f of raw) {
+    const seen = new Set<string>();
+    f.evidence = f.evidence.filter((e) => {
+      const k = `${e.side}|${e.docName}|${e.clauseId}|${e.quote}`;
+      return seen.has(k) ? false : (seen.add(k), true);
     });
   }
 
