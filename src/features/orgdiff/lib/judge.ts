@@ -212,6 +212,39 @@ ${listing}`;
   return r.items;
 }
 
+// ---------- 4б. Кому передать утраченную функцию (опция 3 ТЗ) ----------
+
+export interface RecipientSuggestion {
+  ref: string;
+  recipient: string;
+  afterRef: string;
+  reason: string;
+}
+
+const RECIPIENT_SCHEMA = S.obj({
+  items: S.arr(
+    S.obj({
+      ref: S.str('ссылка утраченной функции, например B12'),
+      recipient: S.str('подразделение или должность из списка — как в заголовке ###'),
+      afterRef: S.str('ссылка пункта этого подразделения, на котором основана рекомендация, например A40'),
+      reason: S.str('1 предложение: почему функция логично ложится на это подразделение')
+    })
+  )
+});
+
+export async function suggestRecipients(lost: Fn[], units: { label: string; fns: Fn[] }[]): Promise<RecipientSuggestion[]> {
+  if (!lost.length || !units.length) return [];
+  const prompt = `После реорганизации часть функций прежней редакции не закреплена ни за кем. Для каждой утраченной функции предложи, за каким подразделением новой структуры её логично закрепить, опираясь на его собственные функции (предмет и объект работы, а не общие формулировки прав). Укажи пункт подразделения, на котором основан выбор.
+
+Утраченные функции:
+${lost.map((f) => fnLine(f, 300)).join('\n')}
+
+Подразделения новой редакции и их собственные функции:
+${units.map((u) => `### ${u.label}\n${u.fns.map((f) => `[${f.ref}] п. ${f.clause.id}: «${clip(f.clause.text, 200)}»`).join('\n')}`).join('\n\n')}`;
+  const r = await llmJson<{ items: RecipientSuggestion[] }>('suggest_recipients', RECIPIENT_SCHEMA, prompt);
+  return r.items;
+}
+
 // ---------- 5. Состав подразделений, если правило не сработало ----------
 
 export interface LlmUnit {

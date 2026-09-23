@@ -17,6 +17,7 @@ import {
   extractUnitsLLM,
   findConflicts,
   judgeDuplicates,
+  suggestRecipients,
   judgeMatches,
   recheckLosses,
   writeConclusion,
@@ -55,6 +56,7 @@ export const PIPELINE_STEPS = [
   { id: 'recheck', label: 'Самопроверка потерь по всему документу' },
   { id: 'duplicates', label: 'Поиск дублирования и пересечения функций' },
   { id: 'conflicts', label: 'Поиск конфликта интересов (каталог правил IIA/SoD)' },
+  { id: 'redistribute', label: 'Рекомендации по перераспределению утраченных функций' },
   { id: 'assemble', label: 'Проверка цитат и сборка выводов' },
   { id: 'conclusion', label: 'Итоговое аналитическое заключение' }
 ] as const;
@@ -255,6 +257,31 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     (r) => `проверено: ${lostFns.length}, пересмотрено: ${r}`
   );
 
+  // Опция 3 ТЗ: кому передать утраченную функцию — подразделение «после», чьи функции ближе всего по смыслу.
+  const recipients = (f: Fn): Recipient[] => {
+    const v = vectors.get(f.uid);
+    if (!v) return [];
+    // Только собственные функции подразделения: общие для всех пункты и типовые обязанности выбор не различают.
+    const scored = new Map<string, { unit: UnitDef; hits: { clause: Fn; s: number }[] }>();
+    for (const a of fns.after) {
+      const va = vectors.get(a.uid);
+      if (!va || a.holders.length > 2 || GENERIC_DUTY.test(a.clause.text)) continue;
+      const s = cosine(v, va);
+      for (const h of a.holders) {
+        const cur = scored.get(h.key) ?? { unit: h, hits: [] };
+        cur.hits.push({ clause: a, s });
+        scored.set(h.key, cur);
+      }
+    }
+    return [...scored.values()]
+      .map(({ unit, hits }) => {
+        const top = hits.sort((x, y) => y.s - x.s).slice(0, 2);
+        return { unit, clause: top[0].clause, score: top.reduce((n, h) => n + h.s, 0) / top.length };
+      })
+      .sort((x, y) => y.score - x.score)
+      .slice(0, 2);
+  };
+
   // 8. Сборка таблицы сопоставления функций
   const beforeFnById = new Map(fns.before.map((f) => [f.uid, f]));
   const matchRows: MatchRow[] = [];
@@ -339,11 +366,51 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     (r) => `кандидатов: ${r.length}`
   );
 
+  // 10б. Кому передать утраченные функции: LLM выбирает по собственным функциям подразделений, код проверяет ссылки.
+  const lostNow = matchRows.filter((m) => m.status === 'lost' && m.fn).map((m) => m.fn!);
+  const suggestions = await step(
+    'redistribute',
+    'Рекомендации по перераспределению утраченных функций',
+    async () => {
+      const units = structure.after
+        .map((u) => ({
+          unit: u,
+          label: u.abbr ?? u.name,
+          fns: fns.after.filter((f) => f.holders.length <= 2 && f.holders.some((h) => h.key === u.key) && !GENERIC_DUTY.test(f.clause.text)).slice(0, 40)
+        }))
+        .filter((u) => u.fns.length);
+      const raw = await suggestRecipients(lostNow, units);
+      const out = new Map<string, Recipient & { reason: string }>();
+      for (const s of raw) {
+        const u = units.find((x) => x.label === s.recipient.trim());
+        const clause = u?.fns.find((f) => f.ref === s.afterRef);
+        if (u && clause) out.set(s.ref, { unit: u.unit, clause, score: 1, reason: s.reason });
+      }
+      return out;
+    },
+    (r) => `утраченных функций: ${lostNow.length}, рекомендаций: ${r.size}`
+  );
+
   // 11. Сборка результата с проверкой каждой цитаты
   const assembled = await step(
     'assemble',
     'Проверка цитат и сборка выводов',
-    async () => assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef, humanize }),
+    async () =>
+      assemble({
+        parsed,
+        structure,
+        fns,
+        matchRows,
+        dupFindings,
+        coi,
+        afterRef,
+        humanize,
+        recipients: (f) => {
+          const s = suggestions.get(f.ref);
+          return s ? [s, ...recipients(f).filter((r) => r.unit.key !== s.unit.key)] : recipients(f);
+        },
+        reasons: (f) => suggestions.get(f.ref)?.reason
+      }),
     (r) => `выводов: ${r.findings.length}; отброшено без подтверждённой цитаты: выводов ${r.dropped}, цитат ${r.unverified}`
   );
 
@@ -495,13 +562,24 @@ interface AssembleInput {
   coi: { title: string; detail: string; rule: string; holders: string[]; refs: { ref: string; quote: string }[]; severity: 'high' | 'medium' | 'low'; confidence: number; recommendation: string }[];
   afterRef: Map<string, Fn>;
   humanize: (text: string) => string;
+  recipients: (f: Fn) => Recipient[];
+  reasons: (f: Fn) => string | undefined;
 }
+
+interface Recipient {
+  unit: UnitDef;
+  clause: Fn;
+  score: number;
+}
+
+/** Ниже этого сходства «ближайшее» подразделение — случайное, рекомендовать его нельзя. */
+const RECIPIENT_MIN_SCORE = 0.45;
 
 /** Типовые обязанности, которые есть у каждого руководителя: их совпадение — не содержательный дубль. */
 const GENERIC_DUTY =
   /по всему кругу вопросов|прочих поручений|профессионального уровня|запрашива\p{L}* у Руководителей Общества информаци|в разработке ВНД|в разработке проектов документации/iu;
 
-function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef, humanize }: AssembleInput) {
+function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRef, humanize, recipients, reasons }: AssembleInput) {
   for (const m of matchRows) m.explanation = humanize(m.explanation);
   const clauseOf = (side: DocSide, docName: string, id: string) =>
     parsed[side].find((c) => c.docName === docName && c.id === id);
@@ -690,6 +768,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     const holders = m.fn.holders.map((h) => unitId(h.key));
     const who = holderLabel(m.fn);
     if (m.status === 'lost') {
+      const redis = redistribution(m.fn, recipients(m.fn), reasons(m.fn));
       raw.push({
         kind: 'function_lost',
         severity: 'high',
@@ -704,11 +783,12 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
             before: ev(m.fn.clause),
             after: m.after[0] ? ev(m.after[0].clause) : undefined,
             note: m.partialLoss ? 'в новой редакции — лишь частичное покрытие общими нормами' : 'соответствия в новой редакции не найдено'
-          }
+          },
+          ...(redis.pairs ?? [])
         ],
         matchIds: [m.id!],
         confidence: m.confidence,
-        recommendation: 'Проверить, должна ли функция сохраниться, и при необходимости закрепить её за профильным подразделением.'
+        recommendation: redis.recommendation
       });
     } else {
       raw.push({
@@ -721,7 +801,11 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
         evidence: [ev(m.fn.clause, m.lostPart && quoteInText(m.lostPart, m.fn.clause.text) ? m.lostPart : undefined), ...m.after.slice(0, 2).map((a) => ev(a.clause))],
         pairs: [{ before: ev(m.fn.clause), after: m.after[0] && ev(m.after[0].clause), note: m.lostPart ? `убрано: «${m.lostPart}»` : undefined }],
         matchIds: [m.id!],
-        confidence: m.confidence
+        confidence: m.confidence,
+        recommendation:
+          m.lostPart && m.after[0]
+            ? `Проверить, намеренно ли из п. ${m.after[0].clause.id} убрано «${m.lostPart}»; если нет — вернуть формулировку п. ${m.fn.clause.id} прежней редакции.`
+            : `Сверить объём функции с п. ${m.fn.clause.id} прежней редакции и при необходимости восстановить утраченную часть.`
       });
     }
   }
@@ -835,6 +919,31 @@ function resultIdOf(docs: DocInput[]): string {
     h.update(`${d.side}\0${d.name}\0`).update(d.buffer);
   }
   return h.digest('hex').slice(0, 16);
+}
+
+/**
+ * Рекомендация по перераспределению утраченной функции (опция 3 ТЗ): ближайший по смыслу носитель
+ * в новой структуре с обоснованием — его пунктом. Детерминированно, по уже посчитанным эмбеддингам.
+ */
+function redistribution(fn: Fn, rs: Recipient[], reason?: string): Pick<Finding, 'recommendation' | 'pairs'> {
+  const top = rs.filter((r) => r.score >= RECIPIENT_MIN_SCORE);
+  if (!top.length) {
+    return { recommendation: 'Явного получателя по смыслу в новой структуре нет: решение о закреплении функции — за руководителем блока.' };
+  }
+  const name = (u: UnitDef) => u.abbr ?? u.name;
+  const [first, second] = top;
+  const prev = fn.holders.map(name).join(', ');
+  const same = fn.holders.some((h) => h.key === first.unit.key);
+  const text =
+    `Закрепить функцию за ${name(first.unit)}${same ? ' (прежний носитель)' : prev ? ` (прежде — ${prev})` : ''}: ` +
+    (reason ? `${reason.replace(/\.$/, '')} (п. ${first.clause.clause.id}).` : `в новой редакции ему ближе всего по смыслу п. ${first.clause.clause.id} «${clip(first.clause.clause.text, 90)}».`) +
+    (second && !reason ? ` Альтернатива — ${name(second.unit)} (п. ${second.clause.clause.id}).` : '');
+  return {
+    recommendation: text,
+    pairs: [
+      { before: ev(fn.clause), after: ev(first.clause.clause), note: `ближайшая функция предлагаемого получателя — ${name(first.unit)}` }
+    ]
+  };
 }
 
 const flowKey = (f: UnitFlow) => `${f.from.replace(/^u-/, '')}→${f.to.replace(/^u-/, '')}`;
