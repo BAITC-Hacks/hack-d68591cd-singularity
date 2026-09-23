@@ -25,6 +25,7 @@ bun run typecheck && bun run lint
 | `src/features/orgdiff/lib/units.ts` | подразделения, должности, подчинённость, носители функций (правила) |
 | `src/features/orgdiff/lib/functions.ts` | функции = пункты с носителями |
 | `src/features/orgdiff/lib/judge.ts` | промпты LLM со строгими JSON-схемами, каталог правил конфликта интересов |
+| `src/features/orgdiff/lib/compliance.ts` | опция 1 ТЗ: сверка новой редакции с `data/requirements.json` (IIA, Закон РК «Об АО», 208-ФЗ), один LLM-вызов, цитаты проверяются |
 | `src/features/orgdiff/lib/llm.ts` | OpenAI Responses API + дисковый кэш |
 | `src/app/api/report/` | `POST /api/report` — заключение из присланного результата и решений сотрудника |
 | `src/app/api/analyze/` | `POST /api/analyze` (файлы или `?demo=1`) → `GET /api/analyze/{jobId}` → `GET …/{jobId}/report` (.docx / `?format=md`) |

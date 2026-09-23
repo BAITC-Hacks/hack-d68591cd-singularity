@@ -11,8 +11,8 @@ import {
   TextRun,
   WidthType
 } from 'docx';
-import type { AnalysisResult, Evidence, Finding, FindingKind, FindingReview, Severity, UnitStatus } from '../types';
-import { FINDING_KIND_LABELS } from '../types';
+import type { AnalysisResult, ComplianceItem, Evidence, Finding, FindingKind, FindingReview, Severity, UnitStatus } from '../types';
+import { COMPLIANCE_STATUS_LABELS, FINDING_KIND_LABELS } from '../types';
 
 /**
  * Итоговое заключение документом (must have 5 ТЗ): то же содержание, что в интерфейсе,
@@ -77,6 +77,20 @@ const refsLabel = (ids: string[], reviews: Reviews) =>
 const findingMeta = (f: Finding) =>
   `Серьёзность: ${SEVERITY[f.severity]}; уверенность: ${Math.round(f.confidence * 100)}%`;
 
+// ---------------------------------------------------------------- Сверка с внешними требованиями (опция 1 ТЗ)
+
+const COMPLIANCE_TITLE = '7. Сверка с внешними требованиями';
+const COMPLIANCE_DISCLAIMER =
+  'Сверка — ориентир для проверки, не юридическое заключение. Статус «Не найдено в комплекте» не означает нарушения: требование может закрываться уставом или другим документом вне комплекта. Требования РК применимы к акционерным обществам — резидентам РК, РФ — к публичным АО РФ, стандарты IIA — профессиональный ориентир.';
+
+const complianceSummary = (items: ComplianceItem[]) =>
+  (Object.keys(COMPLIANCE_STATUS_LABELS) as ComplianceItem['status'][])
+    .map((st) => `${COMPLIANCE_STATUS_LABELS[st].toLowerCase()} — ${items.filter((x) => x.status === st).length}`)
+    .join(', ');
+const complianceSource = (c: ComplianceItem) => `${c.source}${c.verified === false ? ' (номер нормы не перепроверен)' : ''}`;
+const complianceRefs = (r: AnalysisResult, c: ComplianceItem) => c.evidence.map((e) => sourceLine(r, e));
+const mdCell = (s: string) => s.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+
 // ---------------------------------------------------------------- Markdown
 
 export function reportMarkdown(r: AnalysisResult, reviews: Reviews = {}): string {
@@ -134,6 +148,19 @@ export function reportMarkdown(r: AnalysisResult, reviews: Reviews = {}): string
     `Пунктов: до — ${s.clausesBefore}, после — ${s.clausesAfter}. Подразделений: создано — ${s.unitsCreated}, упразднено — ${s.unitsRemoved}, реорганизовано — ${s.unitsReorganized}, без изменений — ${s.unitsRetained}. Потерянных функций: ${s.functionsLost}. Выводов: ${s.findings}.`,
     ''
   );
+
+  const comp = r.compliance ?? [];
+  if (comp.length) {
+    out.push(`## ${COMPLIANCE_TITLE}`, '', `> ${COMPLIANCE_DISCLAIMER}`, '', `Новая редакция, требований: ${comp.length} (${complianceSummary(comp)}).`, '');
+    out.push('| Требование | Источник | Статус | Пункты новой редакции и пояснение |', '|---|---|---|---|');
+    for (const c of comp) {
+      const refs = complianceRefs(r, c).map(mdCell).join('<br>');
+      out.push(
+        `| ${mdCell(c.requirement)} | [${mdCell(complianceSource(c))}](${c.url}) | ${COMPLIANCE_STATUS_LABELS[c.status]} | ${refs ? `${refs}<br>` : ''}_${mdCell(c.note)}_ |`
+      );
+    }
+    out.push('');
+  }
   return out.join('\n');
 }
 
@@ -147,6 +174,9 @@ const bullet = (text: string) => new Paragraph({ bullet: { level: 0 }, spacing: 
 
 const cell = (text: string, bold = false) =>
   new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, bold, size: 20 })] })] });
+
+const GRID_LINE = { style: BorderStyle.SINGLE, size: 1, color: '999999' } as const;
+const GRID = { top: GRID_LINE, bottom: GRID_LINE, left: GRID_LINE, right: GRID_LINE, insideHorizontal: GRID_LINE, insideVertical: GRID_LINE };
 
 export async function reportDocx(r: AnalysisResult, reviews: Reviews = {}): Promise<Buffer> {
   const children: (Paragraph | Table)[] = [];
@@ -221,6 +251,41 @@ export async function reportDocx(r: AnalysisResult, reviews: Reviews = {}): Prom
       `Пунктов: до — ${s.clausesBefore}, после — ${s.clausesAfter}. Подразделений: создано — ${s.unitsCreated}, упразднено — ${s.unitsRemoved}, реорганизовано — ${s.unitsReorganized}, без изменений — ${s.unitsRetained}. Потерянных функций: ${s.functionsLost}. Выводов: ${s.findings}.`
     )
   );
+
+  const comp = r.compliance ?? [];
+  if (comp.length) {
+    children.push(
+      h(COMPLIANCE_TITLE, HeadingLevel.HEADING_1),
+      p(COMPLIANCE_DISCLAIMER, { italic: true }),
+      p(`Новая редакция, требований: ${comp.length} (${complianceSummary(comp)}).`),
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: GRID,
+        rows: [
+          new TableRow({
+            tableHeader: true,
+            children: [cell('Требование', true), cell('Источник', true), cell('Статус', true), cell('Пункты новой редакции и пояснение', true)]
+          }),
+          ...comp.map(
+            (c) =>
+              new TableRow({
+                children: [
+                  cell(c.requirement),
+                  cell(complianceSource(c)),
+                  cell(COMPLIANCE_STATUS_LABELS[c.status], c.status === 'not_met' || c.status === 'contradicts'),
+                  new TableCell({
+                    children: [
+                      ...complianceRefs(r, c).map((t) => new Paragraph({ children: [new TextRun({ text: t, size: 18 })] })),
+                      new Paragraph({ children: [new TextRun({ text: c.note, italics: true, size: 18 })] })
+                    ]
+                  })
+                ]
+              })
+          )
+        ]
+      })
+    );
+  }
 
   const doc = new Document({
     creator: 'OrgDiff',

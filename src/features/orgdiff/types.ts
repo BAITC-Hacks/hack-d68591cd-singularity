@@ -194,6 +194,42 @@ export interface Conclusion {
   disclaimer: string;
 }
 
+/** Юрисдикция внешнего требования: стандарты IIA, законодательство РК или РФ. */
+export type Jurisdiction = 'IIA' | 'KZ' | 'RU';
+
+/**
+ * Статус соответствия новой редакции требованию (опция 1 ТЗ).
+ * no_evidence — в комплекте нет положений по теме; это не нарушение: требование может закрываться уставом или иным документом вне комплекта.
+ */
+export type ComplianceStatus = 'met' | 'partial' | 'not_met' | 'contradicts' | 'no_evidence';
+
+export const COMPLIANCE_STATUS_LABELS: Record<ComplianceStatus, string> = {
+  met: 'Выполнено',
+  partial: 'Частично',
+  not_met: 'Не выполнено',
+  contradicts: 'Противоречит',
+  no_evidence: 'Не найдено в комплекте'
+};
+
+/** Сверка новой редакции с одним внешним требованием (законодательство, стандарты). */
+export interface ComplianceItem {
+  /** id из data/requirements.json: "KZ-AO-61-3" */
+  requirementId: string;
+  jurisdiction: Jurisdiction;
+  /** Ссылка на норму: «Закон РК «Об АО», ст. 61 п. 3» */
+  source: string;
+  /** Краткий парафраз требования */
+  requirement: string;
+  url: string;
+  status: ComplianceStatus;
+  /** Пункты новой редакции с проверенными цитатами; у met/partial/not_met/contradicts пусто быть не может */
+  evidence: Evidence[];
+  /** 1–2 предложения: почему такой статус */
+  note: string;
+  /** Номер нормы перепроверен по официальному источнику */
+  verified?: boolean;
+}
+
 /** Шаг агента — для ленты прогресса и прозрачности решения. */
 export interface TraceStep {
   id: string;
@@ -216,6 +252,8 @@ export interface AnalysisResult {
   matches: FunctionMatch[];
   findings: Finding[];
   conclusion: Conclusion;
+  /** Сверка новой редакции с внешними требованиями (IIA, законы об АО); ориентир, не юридическое заключение */
+  compliance?: ComplianceItem[];
   trace: TraceStep[];
   stats: {
     clausesBefore: number;

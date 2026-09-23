@@ -1,0 +1,122 @@
+[
+  {
+    "id": "IIA-7.1-BOARD",
+    "jurisdiction": "IIA",
+    "text": "Функция внутреннего аудита напрямую подотчётна совету директоров; совет санкционирует назначение и освобождение руководителя внутреннего аудита и участвует в оценке его работы и вознаграждения; подчинённость закреплена в положении о внутреннем аудите.",
+    "source_ref": "IIA GIAS 2024, Standard 7.1 Organizational Independence (Requirements; Essential Conditions — Board)",
+    "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+    "verified": true
+  },
+  {
+    "id": "IIA-7.1-NONAUDIT",
+    "jurisdiction": "IIA",
+    "text": "Роли руководителя внутреннего аудита вне аудита (в т.ч. участие в органах управления) описываются в положении вместе с мерами защиты; если такие области подлежат аудиту, гарантии по ним даёт независимый внешний провайдер, подотчётный совету директоров.",
+    "source_ref": "IIA GIAS 2024, Standard 7.1 Organizational Independence (Requirements)",
+    "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+    "verified": true
+  },
+  {
+    "id": "IIA-6.2-CHARTER",
+    "jurisdiction": "IIA",
+    "text": "Положение о внутреннем аудите утверждается советом директоров и определяет назначение, мандат и виды услуг, приверженность Стандартам, организационный статус и линии подчинённости.",
+    "source_ref": "IIA GIAS 2024, Standard 6.2 Internal Audit Charter (Requirements; Essential Conditions — Board)",
+    "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+    "verified": true
+  },
+  {
+    "id": "IIA-9.4-PLAN",
+    "jurisdiction": "IIA",
+    "text": "План внутреннего аудита строится на документированной, не реже раза в год обновляемой оценке рисков и утверждается советом директоров вместе с бюджетом и планом ресурсов.",
+    "source_ref": "IIA GIAS 2024, Standard 9.4 Internal Audit Plan; Standard 6.3 (Essential Conditions — Board)",
+    "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+    "verified": true
+  },
+  {
+    "id": "IIA-6.3-ACCESS",
+    "jurisdiction": "IIA",
+    "text": "Внутреннему аудиту обеспечен неограниченный доступ к данным, документам, информации, работникам и имуществу, необходимым для выполнения мандата.",
+    "source_ref": "IIA GIAS 2024, Standard 6.3 Board and Senior Management Support (Essential Conditions — Board)",
+    "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+    "verified": true
+  },
+  {
+    "id": "IIA-2.2-OBJECTIVITY",
+    "jurisdiction": "IIA",
+    "text": "Внутренние аудиторы сохраняют объективность и избегают конфликта интересов: не проверяют деятельность, за которую отвечали в предыдущие 12 месяцев, а переход от консультирования к проверке того же объекта допускается только при подтверждённой объективности.",
+    "source_ref": "IIA GIAS 2024, Standard 2.1 Individual Objectivity; Standard 2.2 Safeguarding Objectivity",
+    "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+    "verified": true
+  },
+  {
+    "id": "IIA-8.3-QAIP",
+    "jurisdiction": "IIA",
+    "text": "Руководитель внутреннего аудита разрабатывает и поддерживает программу обеспечения и повышения качества, охватывающую все аспекты деятельности и включающую внутренние (постоянный мониторинг, периодические самооценки) и внешние оценки; результаты внутренних оценок докладываются совету директоров не реже раза в год.",
+    "source_ref": "IIA GIAS 2024, Standard 8.3 Quality; Standard 12.1 Internal Quality Assessment",
+    "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+    "verified": true
+  },
+  {
+    "id": "IIA-8.4-EQA",
+    "jurisdiction": "IIA",
+    "text": "Внешняя оценка качества внутреннего аудита проводится не реже одного раза в пять лет квалифицированным независимым оценщиком (или как самооценка с независимым подтверждением); план внешней оценки обсуждается с советом директоров.",
+    "source_ref": "IIA GIAS 2024, Standard 8.4 External Quality Assessment",
+    "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+    "verified": true
+  },
+  {
+    "id": "IIA-8.1-REPORTING",
+    "jurisdiction": "IIA",
+    "text": "Руководитель внутреннего аудита отчитывается перед советом директоров: план и бюджет и их существенные изменения, угрозы независимости, результаты работы, результаты программы обеспечения качества.",
+    "source_ref": "IIA GIAS 2024, Standard 8.1 Board Interaction",
+    "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+    "verified": true
+  },
+  {
+    "id": "IIA-15.2-FOLLOWUP",
+    "jurisdiction": "IIA",
+    "text": "Внутренний аудит по установленной методологии подтверждает выполнение рекомендаций и планов действий руководства: запрашивает ход выполнения, проводит последующие проверки, ведёт учёт статусов.",
+    "source_ref": "IIA GIAS 2024, Standard 15.2 Confirming the Implementation of Recommendations or Action Plans",
+    "url": "https://www.theiia.org/globalassets/site/standards/editable-versions/globalinternalauditstandards_2024january9_editable.pdf",
+    "verified": true
+  },
+  {
+    "id": "KZ-AO-61-3",
+    "jurisdiction": "KZ",
+    "text": "Служба внутреннего аудита непосредственно подчиняется совету директоров и отчитывается перед ним о своей работе.",
+    "source_ref": "Закон РК «Об акционерных обществах» № 415-II, ст. 61 п. 3",
+    "url": "https://adilet.zan.kz/rus/docs/Z030000415_",
+    "verified": true
+  },
+  {
+    "id": "KZ-AO-61-2",
+    "jurisdiction": "KZ",
+    "text": "Работники службы внутреннего аудита не могут быть избраны в состав совета директоров и исполнительного органа общества.",
+    "source_ref": "Закон РК «Об акционерных обществах» № 415-II, ст. 61 п. 2",
+    "url": "https://adilet.zan.kz/rus/docs/Z030000415_",
+    "verified": true
+  },
+  {
+    "id": "KZ-AO-53-2-10",
+    "jurisdiction": "KZ",
+    "text": "К исключительной компетенции совета директоров относятся: численность и срок полномочий службы внутреннего аудита, назначение и досрочное прекращение полномочий её руководителя и работников, порядок работы, размер и условия оплаты труда и премирования.",
+    "source_ref": "Закон РК «Об акционерных обществах» № 415-II, ст. 53 п. 2 пп. 10",
+    "url": "https://adilet.zan.kz/rus/docs/Z030000415_",
+    "verified": true
+  },
+  {
+    "id": "KZ-AO-53-1",
+    "jurisdiction": "KZ",
+    "text": "Вопросы внутреннего аудита рассматривает отдельный комитет совета директоров, состоящий исключительно из членов совета директоров, во главе с независимым директором.",
+    "source_ref": "Закон РК «Об акционерных обществах» № 415-II, ст. 53-1 п. 2, 3",
+    "url": "https://adilet.zan.kz/rus/docs/Z030000415_",
+    "verified": true
+  },
+  {
+    "id": "RU-208FZ-87.1-2",
+    "jurisdiction": "RU",
+    "text": "В публичном обществе осуществляется внутренний аудит; совет директоров утверждает внутренние документы о его организации, назначает руководителя (ответственное лицо) и утверждает условия договора с ним.",
+    "source_ref": "Федеральный закон № 208-ФЗ «Об акционерных обществах», ст. 87.1 п. 2 (для публичных АО РФ)",
+    "url": "https://www.consultant.ru/document/cons_doc_LAW_8743/957031dab97d15c7919f58051356601a9e33d217/",
+    "verified": true
+  }
+]
