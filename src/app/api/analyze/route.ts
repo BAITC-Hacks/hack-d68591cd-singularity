@@ -5,7 +5,7 @@ import { demoDocs, startJob } from '@/features/orgdiff/lib/jobs';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const ACCEPTED = /\.(docx|pdf|xlsx|txt|md)$/i;
+const ACCEPTED = /\.(docx|pdf|xlsx|txt|md|png|jpe?g)$/i;
 
 /**
  * Запуск анализа. multipart: before=файлы «до», after=файлы «после» (можно по нескольку).
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     for (const f of [...form.getAll(side), ...form.getAll(`${side}[]`)]) {
       if (typeof f === 'string') continue;
       if (!ACCEPTED.test(f.name)) {
-        return NextResponse.json({ error: `Неподдерживаемый формат: ${f.name}. Нужны .docx, .pdf, .xlsx или .txt` }, { status: 400 });
+        return NextResponse.json({ error: `Неподдерживаемый формат: ${f.name}. Нужны .docx, .pdf, .xlsx, .txt или скан .png/.jpg` }, { status: 400 });
       }
       docs.push({ side, name: f.name, buffer: Buffer.from(await f.arrayBuffer()) });
     }
