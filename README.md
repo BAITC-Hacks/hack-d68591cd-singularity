@@ -49,7 +49,8 @@ flowchart LR
 | `src/features/orgdiff/lib/analyze.ts` | оркестратор агента, сборка выводов и проверка цитат |
 | `src/features/orgdiff/lib/judge.ts` | промпты LLM со строгими JSON-схемами, каталог правил КИ |
 | `src/features/orgdiff/lib/llm.ts` | клиент OpenAI и дисковый кэш ответов |
-| `src/app/api/analyze/` | API: запуск анализа и статус задачи |
+| `src/app/api/analyze/` | API: запуск анализа, статус задачи, выгрузка заключения (`report`) |
+| `src/features/orgdiff/lib/report.ts` | итоговое заключение в DOCX и Markdown |
 | `src/features/orgdiff/components/`, `src/app/dashboard/orgdiff/` | интерфейс |
 | `scripts/eval.ts` | проверка качества по эталону и контрольному комплекту |
 | `data/` | тестовые документы, контрольный комплект, эталон, кэш ответов LLM |
@@ -109,7 +110,7 @@ bun run eval            # проверка качества по эталону 
    - потери функций: ДККМ — п. 5.6.2 (группы контроля качества), п. 5.6.3 (предложения по внешней оценке), ДНМ — п. 5.7.2;
    - дублирование: анализ результатов непрерывного аудита у ДИТААД/ДОА и ДНМ (пп. 5.3.8 и 5.4.5 новой редакции);
    - конфликт интересов: участие Главного аудитора в органах управления подконтрольных обществ (п. 4.4);
-   - у каждого вывода — документ, пункт и цитата; итоговое заключение с рекомендациями.
+   - у каждого вывода — документ, пункт и цитата; итоговое заключение с рекомендациями — на экране и файлом Word/Markdown (`/api/analyze/<jobId>/report`).
 4. Контрольный комплект с заранее известными изменениями: загрузить «после» = `data/control/after_red9_control.txt`. В нём удалена функция (обучение работников ДККМ), одна функция продублирована в ДНМ, а ДККМ переименован в ДМК.
 
 Через API:
@@ -117,6 +118,7 @@ bun run eval            # проверка качества по эталону 
 ```sh
 curl -X POST 'http://localhost:3000/api/analyze?demo=1'          # → {"jobId":"…"}
 curl http://localhost:3000/api/analyze/<jobId>                    # статус, шаги агента, результат
+curl -OJ http://localhost:3000/api/analyze/<jobId>/report         # итоговое заключение .docx (?format=md — Markdown)
 curl -X POST http://localhost:3000/api/analyze -F before=@data/before_polozhenie_red8.docx -F after=@data/after_polozhenie_red9.docx
 ```
 
