@@ -136,7 +136,9 @@ export type FindingKind =
   /** Пересечение зон ответственности */
   | 'responsibility_overlap'
   /** Потенциальный конфликт интересов / нарушение независимости */
-  | 'conflict_of_interest';
+  | 'conflict_of_interest'
+  /** Дефект документа: ссылка на несуществующий пункт или устаревшая после перенумерации */
+  | 'doc_defect';
 
 export const FINDING_KIND_LABELS: Record<FindingKind, string> = {
   unit_created: 'Создано подразделение',
@@ -146,7 +148,8 @@ export const FINDING_KIND_LABELS: Record<FindingKind, string> = {
   function_narrowed: 'Сужение функции',
   function_duplicated: 'Дублирование функций',
   responsibility_overlap: 'Пересечение зон ответственности',
-  conflict_of_interest: 'Конфликт интересов'
+  conflict_of_interest: 'Конфликт интересов',
+  doc_defect: 'Дефект документа'
 };
 
 export type Severity = 'high' | 'medium' | 'low';

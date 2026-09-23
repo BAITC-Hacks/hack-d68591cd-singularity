@@ -22,6 +22,7 @@ import {
   type MatchVerdict
 } from './judge';
 import { embed, llmStats, MODEL } from './llm';
+import { findRefDefects } from './defects';
 import { extractText } from './load-doc';
 import { parseClauses, toPublicClause, type ParsedClause } from './parse-clauses';
 import { clip, cosine, jaccard, norm, quoteInText } from './text';
@@ -329,7 +330,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     'Итоговое аналитическое заключение',
     async () => {
       const digest = assembled.findings
-        .map((f) => `${f.id} [${f.kind}, ${f.severity}] ${f.title}. ${clip(f.detail, 300)} Источники: ${f.evidence.map((e) => `${e.side === 'before' ? 'до' : 'после'} п. ${e.clauseId}`).join(', ')}`)
+        .map((f) => `${f.id} [${f.kind}, ${f.severity}] ${f.title}. ${clip(f.detail, 700)} Источники: ${f.evidence.map((e) => `${e.side === 'before' ? 'до' : 'после'} п. ${e.clauseId}`).join(', ')}`)
         .join('\n');
       const d = await writeConclusion(digest);
       const ids = new Set(assembled.findings.map((f) => f.id));
@@ -724,6 +725,32 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     });
   }
 
+  // Дефекты перекрёстных ссылок новой редакции — детерминированно.
+  for (const d of findRefDefects(parsed.before, parsed.after)) {
+    const shifted = d.kind === 'shifted';
+    raw.push({
+      kind: 'doc_defect',
+      severity: shifted ? 'medium' : 'low',
+      title: shifted
+        ? `Ссылка устарела после перенумерации: п. ${d.clause.id} ссылается на п. ${d.ref}`
+        : `Ссылка на несуществующий пункт: п. ${d.clause.id} → п. ${d.ref}`,
+      detail: shifted
+        ? `Текст п. ${d.clause.id} не менялся, но по номеру п. ${d.ref} в новой редакции теперь другое содержание, а прежнее перенесено в п. ${d.movedTo!.id}. Смысл нормы искажается.`
+        : `В новой редакции нет п. ${d.ref}, на который ссылается п. ${d.clause.id}.`,
+      unitIds: [],
+      evidence: [ev(d.clause), ...(d.target ? [ev(d.target)] : []), ...(d.beforeTarget ? [ev(d.beforeTarget)] : []), ...(d.movedTo ? [ev(d.movedTo)] : [])],
+      pairs: shifted
+        ? [
+            { after: ev(d.clause), note: 'ссылающийся пункт (текст не менялся)' },
+            { before: ev(d.beforeTarget!), after: ev(d.target!), note: `п. ${d.ref}: было → стало` },
+            { before: ev(d.beforeTarget!), after: ev(d.movedTo!), note: `прежнее содержание теперь в п. ${d.movedTo!.id}` }
+          ]
+        : [{ after: ev(d.clause) }],
+      confidence: shifted ? 0.85 : 0.9,
+      recommendation: shifted ? `Заменить ссылку «п. ${d.ref}» на «п. ${d.movedTo!.id}».` : 'Исправить номер пункта в ссылке.'
+    });
+  }
+
   for (const f of raw) {
     const seen = new Set<string>();
     f.evidence = f.evidence.filter((e) => {
@@ -742,7 +769,7 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
   }
   const kept = raw.filter((f) => f.evidence.length > 0);
   const order = { high: 0, medium: 1, low: 2 } as const;
-  const kindOrder = ['unit_removed', 'unit_created', 'unit_reorganized', 'function_lost', 'function_narrowed', 'function_duplicated', 'responsibility_overlap', 'conflict_of_interest'];
+  const kindOrder = ['unit_removed', 'unit_created', 'unit_reorganized', 'function_lost', 'function_narrowed', 'function_duplicated', 'responsibility_overlap', 'conflict_of_interest', 'doc_defect'];
   const findings: Finding[] = kept
     .sort((a, b) => kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) || order[a.severity] - order[b.severity])
     .map((f, i) => ({ ...f, id: `F${i + 1}` }));

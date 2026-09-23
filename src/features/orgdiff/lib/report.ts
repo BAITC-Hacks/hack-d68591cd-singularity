@@ -35,7 +35,8 @@ const KIND_ORDER: FindingKind[] = [
   'function_narrowed',
   'function_duplicated',
   'responsibility_overlap',
-  'conflict_of_interest'
+  'conflict_of_interest',
+  'doc_defect'
 ];
 
 const docLabel = (r: AnalysisResult, side: 'before' | 'after') =>
