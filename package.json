@@ -12,8 +12,6 @@
     "lint:strict": "oxlint --deny-warnings",
     "format": "oxfmt --write . '!**/*.md' '!**/*.mdc' '!**/*.mdx' '!**/*.yml' '!**/*.yaml'",
     "format:check": "oxfmt --check . '!**/*.md' '!**/*.mdc' '!**/*.mdx' '!**/*.yml' '!**/*.yaml'",
-    "progress": "sh scripts/progress.sh",
-    "remind": "sh scripts/remind.sh",
     "verify": "sh scripts/verify.sh",
     "eval": "bun scripts/eval.ts",
     "analyze:demo": "bun scripts/analyze-demo.ts"
