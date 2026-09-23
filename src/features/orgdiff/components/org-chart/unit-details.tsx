@@ -10,6 +10,7 @@ import {
   type Severity,
   type UnitChange
 } from '../../types';
+import { useOpenSource } from '../../hooks/use-orgdiff-params';
 import { UNIT_STATUS_META, unitLabel } from '../../utils/unit-status';
 import { EvidenceChips } from '../evidence-chip';
 
@@ -28,6 +29,7 @@ interface UnitDetailsProps {
 
 export function UnitDetails({ unit, result, onClose, onOpenFunctions }: UnitDetailsProps) {
   const meta = UNIT_STATUS_META[unit.status];
+  const openSource = useOpenSource();
   const nameOf = (id: string) => {
     const found = result.units.find((item) => item.id === id);
     return found ? unitLabel(found) : id;
@@ -60,7 +62,11 @@ export function UnitDetails({ unit, result, onClose, onOpenFunctions }: UnitDeta
         <p>{unit.summary}</p>
 
         <Section title='Источник'>
-          <EvidenceChips evidence={unit.evidence} limit={6} />
+          <EvidenceChips
+            evidence={unit.evidence}
+            limit={6}
+            onClick={() => openSource({ kind: 'unit', id: unit.id })}
+          />
         </Section>
 
         {gaveTo.length > 0 || gotFrom.length > 0 ? (
@@ -98,8 +104,18 @@ export function UnitDetails({ unit, result, onClose, onOpenFunctions }: UnitDeta
                     {SEVERITY_LABELS[finding.severity]} · уверенность{' '}
                     {Math.round(finding.confidence * 100)}%
                   </p>
-                  <p className='leading-snug'>{finding.title}</p>
-                  <EvidenceChips evidence={finding.evidence} limit={3} />
+                  <button
+                    type='button'
+                    className='text-left leading-snug underline-offset-2 hover:underline'
+                    onClick={() => openSource({ kind: 'finding', id: finding.id })}
+                  >
+                    {finding.title}
+                  </button>
+                  <EvidenceChips
+                    evidence={finding.evidence}
+                    limit={3}
+                    onClick={() => openSource({ kind: 'finding', id: finding.id })}
+                  />
                 </li>
               ))}
             </ul>

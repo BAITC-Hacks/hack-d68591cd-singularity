@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAnalysisResult } from '../api/queries';
 import { useOrgdiffParams, type OrgdiffTab } from '../hooks/use-orgdiff-params';
 import type { AnalysisResult } from '../types';
+import { EvidenceSheet } from './evidence-sheet/evidence-sheet';
 import { FunctionTable } from './function-table/function-table';
 import { OrgChart } from './org-chart/org-chart';
 import { ResultPlaceholder } from './result-placeholder';
@@ -19,45 +20,54 @@ const RESULT_TABS: { id: ResultTab; label: string }[] = [
 ];
 
 export function OrgdiffView() {
-  const [{ tab, unit }, setParams] = useOrgdiffParams();
+  const [{ tab, unit, source }, setParams] = useOrgdiffParams();
   const result = useAnalysisResult();
 
   return (
-    <Tabs value={tab} onValueChange={(value) => void setParams({ tab: value as OrgdiffTab })}>
-      <TabsList>
-        <TabsTrigger value='upload'>Загрузка</TabsTrigger>
-        {RESULT_TABS.map(({ id, label }) => (
-          <TabsTrigger key={id} value={id} disabled={!result}>
-            {label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
+    <>
+      {result ? (
+        <EvidenceSheet
+          result={result}
+          source={source}
+          onClose={() => void setParams({ source: null })}
+        />
+      ) : null}
+      <Tabs value={tab} onValueChange={(value) => void setParams({ tab: value as OrgdiffTab })}>
+        <TabsList>
+          <TabsTrigger value='upload'>Загрузка</TabsTrigger>
+          {RESULT_TABS.map(({ id, label }) => (
+            <TabsTrigger key={id} value={id} disabled={!result}>
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <TabsContent value='upload' keepMounted className='pt-2'>
-        <UploadPanel onShowResults={() => void setParams({ tab: 'chart', unit: null })} />
-      </TabsContent>
-
-      {RESULT_TABS.map(({ id }) => (
-        <TabsContent key={id} value={id} className='pt-2'>
-          {result ? (
-            <ResultTabContent
-              tab={id}
-              result={result}
-              selectedUnitId={unit}
-              onSelectUnit={(unitId) => void setParams({ unit: unitId })}
-              onOpenFunctions={(unitId) => void setParams({ tab: 'functions', unit: unitId })}
-            />
-          ) : (
-            <ResultPlaceholder
-              title='Анализ ещё не запускался'
-              description='Загрузите комплекты «до» и «после» (или тестовый комплект) и нажмите «Анализировать».'
-              actionLabel='К загрузке документов'
-              onAction={() => void setParams({ tab: 'upload' })}
-            />
-          )}
+        <TabsContent value='upload' keepMounted className='pt-2'>
+          <UploadPanel onShowResults={() => void setParams({ tab: 'chart', unit: null })} />
         </TabsContent>
-      ))}
-    </Tabs>
+
+        {RESULT_TABS.map(({ id }) => (
+          <TabsContent key={id} value={id} className='pt-2'>
+            {result ? (
+              <ResultTabContent
+                tab={id}
+                result={result}
+                selectedUnitId={unit}
+                onSelectUnit={(unitId) => void setParams({ unit: unitId })}
+                onOpenFunctions={(unitId) => void setParams({ tab: 'functions', unit: unitId })}
+              />
+            ) : (
+              <ResultPlaceholder
+                title='Анализ ещё не запускался'
+                description='Загрузите комплекты «до» и «после» (или тестовый комплект) и нажмите «Анализировать».'
+                actionLabel='К загрузке документов'
+                onAction={() => void setParams({ tab: 'upload' })}
+              />
+            )}
+          </TabsContent>
+        ))}
+      </Tabs>
+    </>
   );
 }
 

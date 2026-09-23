@@ -5,13 +5,20 @@ import {
   Background,
   Controls,
   ReactFlow,
+  type EdgeMouseHandler,
   type NodeMouseHandler,
   type NodeTypes
 } from '@xyflow/react';
 import { useTheme } from 'next-themes';
 import { useMemo } from 'react';
 import type { AnalysisResult } from '../../types';
-import { applyFocus, buildOrgGraph, type OrgNode } from '../../utils/build-org-graph';
+import { useOpenSource } from '../../hooks/use-orgdiff-params';
+import {
+  applyFocus,
+  buildOrgGraph,
+  type FlowEdge,
+  type OrgNode
+} from '../../utils/build-org-graph';
 import { ChartLegend } from './chart-legend';
 import { ColumnNode } from './column-node';
 import { UnitDetails } from './unit-details';
@@ -32,6 +39,12 @@ export function OrgChart({ result, selectedUnitId, onSelectUnit, onOpenFunctions
   const focused = useMemo(() => applyFocus(graph, selectedUnitId), [graph, selectedUnitId]);
   const selectedUnit = result.units.find((unit) => unit.id === selectedUnitId);
 
+  const openSource = useOpenSource();
+  const handleEdgeClick: EdgeMouseHandler<FlowEdge> = (_event, edge) => {
+    const flow = edge.data?.flow;
+    if (flow) openSource({ kind: 'flow', from: flow.from, to: flow.to });
+  };
+
   const handleNodeClick: NodeMouseHandler<OrgNode> = (_event, node) => {
     if (node.type !== 'unit') return;
     const unitId = node.data.unit.id;
@@ -43,11 +56,12 @@ export function OrgChart({ result, selectedUnitId, onSelectUnit, onOpenFunctions
       <ChartLegend />
       <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]'>
         <div className='bg-card h-[640px] overflow-hidden rounded-lg border'>
-          <ReactFlow<OrgNode>
+          <ReactFlow<OrgNode, FlowEdge>
             nodes={focused.nodes}
             edges={focused.edges}
             nodeTypes={NODE_TYPES}
             onNodeClick={handleNodeClick}
+            onEdgeClick={handleEdgeClick}
             onPaneClick={() => onSelectUnit(null)}
             colorMode={resolvedTheme === 'dark' ? 'dark' : 'light'}
             nodesConnectable={false}
