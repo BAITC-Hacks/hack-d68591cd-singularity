@@ -79,8 +79,8 @@ export interface UnitFlow {
 export interface UnitFunction {
   id: string;
   side: DocSide;
-  /** UnitChange.id; null — функция закреплена за блоком в целом */
-  unitId: string | null;
+  /** UnitChange.id носителей; пусто — функция закреплена за блоком в целом */
+  unitIds: string[];
   /** Нормализованная формулировка: «действие + объект» */
   text: string;
   clauseId: string;
@@ -108,8 +108,8 @@ export interface FunctionMatch {
   status: MatchStatus;
   /** UnitFunction.id; нет у added */
   beforeId?: string;
-  /** UnitFunction.id; нет у lost */
-  afterId?: string;
+  /** UnitFunction.id пунктов «после», которые покрывают функцию; пусто у lost */
+  afterIds: string[];
   /** Почему так решено — одно-два предложения */
   explanation: string;
   confidence: number;
