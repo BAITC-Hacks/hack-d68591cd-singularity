@@ -20,7 +20,7 @@ bun run typecheck && bun run lint
 | Путь | Роль |
 |---|---|
 | `src/features/orgdiff/types.ts` | контракт пайплайн ↔ интерфейс (`AnalysisResult`, `Finding`, `Evidence`…) |
-| `src/features/orgdiff/lib/analyze.ts` | оркестратор: 11 шагов агента, trace, сборка и проверка выводов |
+| `src/features/orgdiff/lib/analyze.ts` | оркестратор: шаги агента (PIPELINE_STEPS), trace, сборка и проверка выводов |
 | `src/features/orgdiff/lib/parse-clauses.ts` | документ → пункты с номерами (склеенные пункты, оглавление) |
 | `src/features/orgdiff/lib/units.ts` | подразделения, должности, подчинённость, носители функций (правила) |
 | `src/features/orgdiff/lib/functions.ts` | функции = пункты с носителями |
