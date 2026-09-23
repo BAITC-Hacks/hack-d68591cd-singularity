@@ -18,7 +18,7 @@ export interface Fn {
 
 /** Разделы, где нет функций подразделений: общие положения, структура (её разбирает units.ts), термины. */
 const NON_FUNCTION_SECTION = /преамбула|общие положения|структура|термин|определени|заключительн|приложени/iu;
-const ROLE_HEADER = /^(главн\p{L}*\s+аудитор|директор|руководител|работник|начальник|департамент)/iu;
+const ROLE_HEADER = /^(главн\p{L}*\s+аудитор|директор|руководител|работник|начальник|департамент|управлени|отдел|служб|сектор|центр|групп|дирекци)/iu;
 
 export const clauseUid = (c: ParsedClause) => `${c.side}:${c.docName}:${c.id}`;
 
@@ -32,7 +32,8 @@ export function buildFunctions(clauses: ParsedClause[], units: UnitDef[], side: 
 
   const out: Fn[] = [];
   for (const c of clauses) {
-    if (NON_FUNCTION_SECTION.test(c.sectionTitle)) continue;
+    // Строки таблицы оргструктуры описывают состав, а не функции — их разбирает units.ts.
+    if (c.cells || NON_FUNCTION_SECTION.test(c.sectionTitle)) continue;
     const text = c.text.trim();
     if (norm(text).length < 15) continue;
     // Вводные строки перечней («5.3. Директор ДОА:», «…осуществляет следующие функции:») — не функции.
