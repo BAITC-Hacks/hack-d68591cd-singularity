@@ -129,6 +129,8 @@ bun scripts/analyze-files.ts --before old.pdf --after new.docx --after prikaz.do
 curl -X POST 'http://localhost:3000/api/analyze?demo=1'          # → {"jobId":"…"}
 curl http://localhost:3000/api/analyze/<jobId>                    # статус, шаги агента, результат
 curl -OJ http://localhost:3000/api/analyze/<jobId>/report         # итоговое заключение .docx (?format=md — Markdown)
+# без состояния сервера, с решениями сотрудника: тело { result, reviews: { "F7": "confirmed", "F25": "rejected" } }
+curl -OJ -X POST 'http://localhost:3000/api/report?format=docx' -H 'Content-Type: application/json' -d @request.json
 curl -X POST http://localhost:3000/api/analyze -F before=@data/before_polozhenie_red8.docx -F after=@data/after_polozhenie_red9.docx
 ```
 

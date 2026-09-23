@@ -11,7 +11,7 @@ import {
   TextRun,
   WidthType
 } from 'docx';
-import type { AnalysisResult, Evidence, Finding, FindingKind, Severity, UnitStatus } from '../types';
+import type { AnalysisResult, Evidence, Finding, FindingKind, FindingReview, Severity, UnitStatus } from '../types';
 import { FINDING_KIND_LABELS } from '../types';
 
 /**
@@ -52,20 +52,40 @@ const shortOf = (r: AnalysisResult, e: Evidence) => {
 
 const sourceLine = (r: AnalysisResult, e: Evidence) => `${shortOf(r, e)}, п. ${e.clauseId}: «${e.quote}»`;
 
-const grouped = (r: AnalysisResult) =>
-  KIND_ORDER.map((kind) => ({ kind, items: r.findings.filter((f) => f.kind === kind) })).filter((g) => g.items.length);
+export type Reviews = Readonly<Record<string, FindingReview>>;
+
+/** Отклонённые сотрудником выводы уходят в приложение, остальные — в основной перечень. */
+const grouped = (r: AnalysisResult, reviews: Reviews) =>
+  KIND_ORDER.map((kind) => ({
+    kind,
+    items: r.findings.filter((f) => f.kind === kind && reviews[f.id] !== 'rejected')
+  })).filter((g) => g.items.length);
+
+const rejectedOf = (r: AnalysisResult, reviews: Reviews) => r.findings.filter((f) => reviews[f.id] === 'rejected');
+
+const reviewLine = (r: AnalysisResult, reviews: Reviews) => {
+  const confirmed = r.findings.filter((f) => reviews[f.id] === 'confirmed').length;
+  const rejected = rejectedOf(r, reviews).length;
+  return `Проверено сотрудником: ${confirmed + rejected} из ${r.findings.length} выводов (подтверждено — ${confirmed}, отклонено — ${rejected}).`;
+};
+
+const reviewMark = (f: Finding, reviews: Reviews) => (reviews[f.id] === 'confirmed' ? ' — подтверждено сотрудником' : '');
+
+const refsLabel = (ids: string[], reviews: Reviews) =>
+  ids.map((id) => (reviews[id] === 'rejected' ? `${id} (отклонён)` : id)).join(', ');
 
 const findingMeta = (f: Finding) =>
   `Серьёзность: ${SEVERITY[f.severity]}; уверенность: ${Math.round(f.confidence * 100)}%`;
 
 // ---------------------------------------------------------------- Markdown
 
-export function reportMarkdown(r: AnalysisResult): string {
+export function reportMarkdown(r: AnalysisResult, reviews: Reviews = {}): string {
   const out: string[] = [];
   out.push('# Заключение по анализу организационной структуры и функционала', '');
   out.push(`**Документы «до»:** ${docLabel(r, 'before')}  `);
   out.push(`**Документы «после»:** ${docLabel(r, 'after')}  `);
   out.push(`**Сформировано:** ${new Date(r.meta.generatedAt).toLocaleString('ru-RU')} · модель ${r.meta.model}`, '');
+  out.push(`**${reviewLine(r, reviews)}**`, '');
   out.push(`> ${r.conclusion.disclaimer}`, '');
 
   out.push('## 1. Краткое резюме', '', r.conclusion.summary, '');
@@ -79,25 +99,32 @@ export function reportMarkdown(r: AnalysisResult): string {
   out.push('## 3. Аналитическое заключение', '');
   for (const s of r.conclusion.sections) {
     out.push(`### ${s.title}`, '', s.text, '');
-    if (s.findingIds.length) out.push(`_Основание: ${s.findingIds.join(', ')}_`, '');
+    if (s.findingIds.length) out.push(`_Основание: ${refsLabel(s.findingIds, reviews)}_`, '');
   }
 
   out.push('## 4. Рекомендации', '');
   r.conclusion.recommendations.forEach((x, i) =>
-    out.push(`${i + 1}. ${x.text}${x.findingIds.length ? ` _(${x.findingIds.join(', ')})_` : ''}`)
+    out.push(`${i + 1}. ${x.text}${x.findingIds.length ? ` _(${refsLabel(x.findingIds, reviews)})_` : ''}`)
   );
   out.push('');
 
   out.push('## 5. Выводы с источниками', '');
-  for (const g of grouped(r)) {
+  for (const g of grouped(r, reviews)) {
     out.push(`### ${FINDING_KIND_LABELS[g.kind]} — ${g.items.length}`, '');
     for (const f of g.items) {
-      out.push(`**${f.id}. ${f.title}**  `, `${findingMeta(f)}  `, f.detail, '');
+      out.push(`**${f.id}. ${f.title}${reviewMark(f, reviews)}**  `, `${findingMeta(f)}  `, f.detail, '');
       for (const e of f.evidence) out.push(`- ${sourceLine(r, e)}`);
       if (f.recommendation) out.push('', `Рекомендация: ${f.recommendation}`);
       if (f.caveat) out.push('', `Требует проверки: ${f.caveat}`);
       out.push('');
     }
+  }
+
+  const rejected = rejectedOf(r, reviews);
+  if (rejected.length) {
+    out.push('## Приложение. Выводы, отклонённые сотрудником', '');
+    for (const f of rejected) out.push(`- ${f.id}. ${f.title}`);
+    out.push('');
   }
 
   const s = r.stats;
@@ -121,7 +148,7 @@ const bullet = (text: string) => new Paragraph({ bullet: { level: 0 }, spacing: 
 const cell = (text: string, bold = false) =>
   new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, bold, size: 20 })] })] });
 
-export async function reportDocx(r: AnalysisResult): Promise<Buffer> {
+export async function reportDocx(r: AnalysisResult, reviews: Reviews = {}): Promise<Buffer> {
   const children: (Paragraph | Table)[] = [];
   children.push(
     new Paragraph({
@@ -132,6 +159,7 @@ export async function reportDocx(r: AnalysisResult): Promise<Buffer> {
     p(`Документы «до»: ${docLabel(r, 'before')}`),
     p(`Документы «после»: ${docLabel(r, 'after')}`),
     p(`Сформировано: ${new Date(r.meta.generatedAt).toLocaleString('ru-RU')} · модель ${r.meta.model}`),
+    p(reviewLine(r, reviews), { bold: true }),
     p(r.conclusion.disclaimer, { italic: true })
   );
 
@@ -161,23 +189,29 @@ export async function reportDocx(r: AnalysisResult): Promise<Buffer> {
   children.push(h('3. Аналитическое заключение', HeadingLevel.HEADING_1));
   for (const s of r.conclusion.sections) {
     children.push(h(s.title, HeadingLevel.HEADING_2), p(s.text));
-    if (s.findingIds.length) children.push(p(`Основание: ${s.findingIds.join(', ')}`, { italic: true, size: 18 }));
+    if (s.findingIds.length) children.push(p(`Основание: ${refsLabel(s.findingIds, reviews)}`, { italic: true, size: 18 }));
   }
 
   children.push(h('4. Рекомендации', HeadingLevel.HEADING_1));
   r.conclusion.recommendations.forEach((x, i) =>
-    children.push(p(`${i + 1}. ${x.text}${x.findingIds.length ? ` (${x.findingIds.join(', ')})` : ''}`))
+    children.push(p(`${i + 1}. ${x.text}${x.findingIds.length ? ` (${refsLabel(x.findingIds, reviews)})` : ''}`))
   );
 
   children.push(h('5. Выводы с источниками', HeadingLevel.HEADING_1));
-  for (const g of grouped(r)) {
+  for (const g of grouped(r, reviews)) {
     children.push(h(`${FINDING_KIND_LABELS[g.kind]} — ${g.items.length}`, HeadingLevel.HEADING_2));
     for (const f of g.items) {
-      children.push(p(`${f.id}. ${f.title}`, { bold: true }), p(findingMeta(f), { italic: true, size: 18 }), p(f.detail));
+      children.push(p(`${f.id}. ${f.title}${reviewMark(f, reviews)}`, { bold: true }), p(findingMeta(f), { italic: true, size: 18 }), p(f.detail));
       for (const e of f.evidence) children.push(bullet(sourceLine(r, e)));
       if (f.recommendation) children.push(p(`Рекомендация: ${f.recommendation}`));
       if (f.caveat) children.push(p(`Требует проверки: ${f.caveat}`, { italic: true }));
     }
+  }
+
+  const rejected = rejectedOf(r, reviews);
+  if (rejected.length) {
+    children.push(h('Приложение. Выводы, отклонённые сотрудником', HeadingLevel.HEADING_1));
+    for (const f of rejected) children.push(bullet(`${f.id}. ${f.title}`));
   }
 
   const s = r.stats;

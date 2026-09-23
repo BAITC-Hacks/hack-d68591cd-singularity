@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import type {
   AnalysisResult,
   DocSide,
@@ -394,6 +395,7 @@ export async function analyze(docs: DocInput[], onProgress?: ProgressFn): Promis
     meta: {
       model: MODEL,
       generatedAt: new Date().toISOString(),
+      resultId: resultIdOf(docs),
       durationMs: Date.now() - t0,
       fromCache: llmStats.calls - callsBefore > 0 && llmStats.cacheHits - hitsBefore === llmStats.calls - callsBefore
     }
@@ -824,6 +826,15 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
     .map((f, i) => ({ ...f, id: `F${i + 1}` }));
 
   return { units, flows, functions, matches, findings, dropped: raw.length - kept.length, unverified };
+}
+
+/** Стабильный id результата: хеш сторон, имён и содержимого документов. */
+function resultIdOf(docs: DocInput[]): string {
+  const h = createHash('sha256');
+  for (const d of [...docs].sort((a, b) => `${a.side}${a.name}`.localeCompare(`${b.side}${b.name}`))) {
+    h.update(`${d.side}\0${d.name}\0`).update(d.buffer);
+  }
+  return h.digest('hex').slice(0, 16);
 }
 
 const flowKey = (f: UnitFlow) => `${f.from.replace(/^u-/, '')}→${f.to.replace(/^u-/, '')}`;

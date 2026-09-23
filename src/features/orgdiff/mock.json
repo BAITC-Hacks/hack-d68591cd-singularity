@@ -20572,88 +20572,88 @@
       "id": "parse",
       "label": "Чтение документов и разбор на пункты",
       "status": "done",
-      "startedAt": 1790159853868,
-      "finishedAt": 1790159853954,
+      "startedAt": 1790160363257,
+      "finishedAt": 1790160363405,
       "detail": "до: 441 пунктов, после: 442 пунктов"
     },
     {
       "id": "structure",
       "label": "Определение состава подразделений",
       "status": "done",
-      "startedAt": 1790159853954,
-      "finishedAt": 1790159853961,
+      "startedAt": 1790160363406,
+      "finishedAt": 1790160363414,
       "detail": "до: ДНМ, ДККМ, Главный аудитор, Директор направления внутреннего аудита; после: ДИТААД, ДОА, ДНМ, ДККМ, Главный аудитор"
     },
     {
       "id": "functions",
       "label": "Извлечение функций и их носителей",
       "status": "done",
-      "startedAt": 1790159853961,
-      "finishedAt": 1790159853972,
+      "startedAt": 1790160363414,
+      "finishedAt": 1790160363424,
       "detail": "до: 377, после: 371"
     },
     {
       "id": "align",
       "label": "Выравнивание неизменённых пунктов",
       "status": "done",
-      "startedAt": 1790159853972,
-      "finishedAt": 1790159853975,
+      "startedAt": 1790160363424,
+      "finishedAt": 1790160363430,
       "detail": "совпали дословно: 320 из 377; к сопоставлению ИИ: 57"
     },
     {
       "id": "embed",
       "label": "Семантические векторы пунктов",
       "status": "done",
-      "startedAt": 1790159853977,
-      "finishedAt": 1790159853985,
+      "startedAt": 1790160363432,
+      "finishedAt": 1790160363448,
       "detail": "492 векторов"
     },
     {
       "id": "match",
       "label": "ИИ-сопоставление изменённых функций",
       "status": "done",
-      "startedAt": 1790159853985,
-      "finishedAt": 1790159868455,
+      "startedAt": 1790160363449,
+      "finishedAt": 1790160363757,
       "detail": "сохранено: 34, сужено: 15, расширено: 4, кандидаты в потерю: 4"
     },
     {
       "id": "recheck",
       "label": "Самопроверка потерь по всему документу",
       "status": "done",
-      "startedAt": 1790159868456,
-      "finishedAt": 1790159874324,
+      "startedAt": 1790160363757,
+      "finishedAt": 1790160363780,
       "detail": "проверено: 4, пересмотрено: 4"
     },
     {
       "id": "duplicates",
       "label": "Поиск дублирования и пересечения функций",
       "status": "done",
-      "startedAt": 1790159874325,
-      "finishedAt": 1790159874328,
+      "startedAt": 1790160363781,
+      "finishedAt": 1790160363784,
       "detail": "найдено: 6"
     },
     {
       "id": "conflicts",
       "label": "Поиск конфликта интересов (каталог правил IIA/SoD)",
       "status": "done",
-      "startedAt": 1790159874328,
-      "finishedAt": 1790159874329,
+      "startedAt": 1790160363784,
+      "finishedAt": 1790160363786,
       "detail": "кандидатов: 4"
     },
     {
       "id": "assemble",
       "label": "Проверка цитат и сборка выводов",
       "status": "done",
-      "startedAt": 1790159874329,
-      "finishedAt": 1790159874342,
+      "startedAt": 1790160363786,
+      "finishedAt": 1790160363805,
       "detail": "выводов: 36; отброшено без подтверждённой цитаты: выводов 0, цитат 0"
     },
     {
       "id": "conclusion",
       "label": "Итоговое аналитическое заключение",
       "status": "done",
-      "startedAt": 1790159874342,
-      "finishedAt": 1790159894986
+      "startedAt": 1790160363805,
+      "finishedAt": 1790160363807
     }
   ],
   "stats": {
@@ -20668,8 +20668,9 @@
   },
   "meta": {
     "model": "gpt-6-sol",
-    "generatedAt": "2026-09-23T10:38:14.986Z",
-    "durationMs": 41118,
-    "fromCache": false
+    "generatedAt": "2026-09-23T10:46:03.808Z",
+    "resultId": "4e40dc7a25e18040",
+    "durationMs": 561,
+    "fromCache": true
   }
 }

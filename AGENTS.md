@@ -26,6 +26,7 @@ bun run typecheck && bun run lint
 | `src/features/orgdiff/lib/functions.ts` | функции = пункты с носителями |
 | `src/features/orgdiff/lib/judge.ts` | промпты LLM со строгими JSON-схемами, каталог правил конфликта интересов |
 | `src/features/orgdiff/lib/llm.ts` | OpenAI Responses API + дисковый кэш |
+| `src/app/api/report/` | `POST /api/report` — заключение из присланного результата и решений сотрудника |
 | `src/app/api/analyze/` | `POST /api/analyze` (файлы или `?demo=1`) → `GET /api/analyze/{jobId}` → `GET …/{jobId}/report` (.docx / `?format=md`) |
 | `src/features/orgdiff/components/`, `src/app/dashboard/orgdiff/` | интерфейс: загрузка, ход анализа, схема «до/после» |
 | `scripts/eval.ts` | метрики качества; `--prune` чистит устаревший кэш |

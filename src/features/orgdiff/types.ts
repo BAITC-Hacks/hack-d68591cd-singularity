@@ -227,7 +227,14 @@ export interface AnalysisResult {
     functionsLost: number;
     findings: number;
   };
-  meta: { model: string; generatedAt: string; durationMs: number; fromCache: boolean };
+  meta: {
+    model: string;
+    generatedAt: string;
+    durationMs: number;
+    fromCache: boolean;
+    /** Хеш содержимого входных документов: одинаков для повторного анализа тех же файлов */
+    resultId?: string;
+  };
 }
 
 /**
@@ -236,6 +243,17 @@ export interface AnalysisResult {
  *   POST /api/analyze?demo=1     без файлов, берёт тестовый комплект из data/ → { jobId }
  *   GET  /api/analyze/{jobId}    → AnalysisJob (опрашивать раз в 1–2 с, пока status = running)
  */
+/** Решение сотрудника по выводу (экран «Находки»). */
+export type FindingReview = 'confirmed' | 'rejected';
+
+/**
+ *   POST /api/report?format=docx|md   { result: AnalysisResult, reviews?: Record<Finding.id, FindingReview> } → файл
+ */
+export interface ReportRequest {
+  result: AnalysisResult;
+  reviews?: Record<string, FindingReview>;
+}
+
 export interface AnalysisJob {
   id: string;
   status: 'running' | 'done' | 'error';
