@@ -5,6 +5,7 @@ import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { FunctionRow } from '../../utils/function-rows';
+import { useOpenSource } from '../../hooks/use-orgdiff-params';
 import { MATCH_STATUS_META } from '../../utils/match-status';
 import { ClauseRef } from './clause-ref';
 
@@ -80,16 +81,7 @@ export const functionColumns: ColumnDef<FunctionRow>[] = [
     id: 'findings',
     header: 'Выводы',
     enableSorting: false,
-    cell: ({ row }) =>
-      row.original.findingIds.length > 0 ? (
-        <div className='flex flex-wrap gap-1'>
-          {row.original.findingIds.map((id) => (
-            <span key={id} className='bg-muted rounded px-1.5 py-0.5 text-xs tabular-nums'>
-              {id}
-            </span>
-          ))}
-        </div>
-      ) : null
+    cell: ({ row }) => <FindingLinks ids={row.original.findingIds} />
   }
 ];
 
@@ -119,5 +111,28 @@ function SortHeader({ label, column }: SortHeaderProps) {
       {label}
       <SortIcon />
     </Button>
+  );
+}
+
+/** Ссылки на выводы по строке; клик не открывает саму строку */
+function FindingLinks({ ids }: { ids: string[] }) {
+  const openSource = useOpenSource();
+  if (ids.length === 0) return null;
+  return (
+    <div className='flex flex-wrap gap-1'>
+      {ids.map((id) => (
+        <button
+          key={id}
+          type='button'
+          className='bg-muted hover:bg-primary/15 rounded px-1.5 py-0.5 text-xs tabular-nums'
+          onClick={(event) => {
+            event.stopPropagation();
+            openSource({ kind: 'finding', id });
+          }}
+        >
+          {id}
+        </button>
+      ))}
+    </div>
   );
 }

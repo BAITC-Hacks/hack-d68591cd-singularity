@@ -18,6 +18,7 @@ import {
   TableRow
 } from '@/components/ui/table';
 import { useFunctionFilters } from '../../hooks/use-function-filters';
+import { useOpenSource } from '../../hooks/use-orgdiff-params';
 import type { AnalysisResult } from '../../types';
 import {
   buildFunctionRows,
@@ -39,6 +40,7 @@ interface FunctionTableProps {
 
 export function FunctionTable({ result, unit, onUnitChange }: FunctionTableProps) {
   const [{ status, q }, setFilters] = useFunctionFilters();
+  const openSource = useOpenSource();
 
   const rows = useMemo(() => buildFunctionRows(result), [result]);
   // Счётчики статусов — с учётом подразделения и поиска, но без фильтра по статусу
@@ -121,7 +123,16 @@ export function FunctionTable({ result, unit, onUnitChange }: FunctionTableProps
           <TableBody>
             {table.getRowModel().rows.length > 0 ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className='align-top'>
+                <TableRow
+                  key={row.id}
+                  tabIndex={0}
+                  aria-label='Открыть источник'
+                  className='hover:bg-muted/50 cursor-pointer align-top'
+                  onClick={() => openSource({ kind: 'match', id: row.id })}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') openSource({ kind: 'match', id: row.id });
+                  }}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className='whitespace-normal'>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
