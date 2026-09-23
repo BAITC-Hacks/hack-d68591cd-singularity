@@ -222,8 +222,9 @@ function matchPairs(match: FunctionMatch, functions: Map<string, UnitFunction>):
   }));
 }
 
+/** docName обязателен при нескольких документах на сторону: номера пунктов в них совпадают */
 function functionRef(fn: UnitFunction): QuoteRef {
-  return { side: fn.side, clauseId: fn.clauseId, quote: fn.quote };
+  return { side: fn.side, clauseId: fn.clauseId, quote: fn.quote, docName: fn.docName };
 }
 
 /** Без явных пар: каждая цитата — отдельной строкой на своей стороне */

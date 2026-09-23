@@ -11,7 +11,8 @@ const KINDS: Record<string, FileKind> = {
   xlsx: { label: 'Excel', icon: 'fileTypeXls' },
   png: { label: 'Скан', icon: 'media' },
   jpg: { label: 'Скан', icon: 'media' },
-  jpeg: { label: 'Скан', icon: 'media' }
+  jpeg: { label: 'Скан', icon: 'media' },
+  txt: { label: 'Текст', icon: 'post' }
 };
 
 const UNKNOWN: FileKind = { label: 'Файл', icon: 'page' };
