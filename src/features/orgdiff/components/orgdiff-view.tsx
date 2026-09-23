@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAnalysisResult } from '../api/queries';
 import { useOrgdiffParams, type OrgdiffTab } from '../hooks/use-orgdiff-params';
 import type { AnalysisResult } from '../types';
+import { ComplianceView } from './compliance/compliance-view';
 import { ConclusionView } from './conclusion/conclusion-view';
 import { EvidenceSheet } from './evidence-sheet/evidence-sheet';
 import { FindingsList } from './findings/findings-list';
@@ -19,6 +20,7 @@ const RESULT_TAB_LABELS: Record<ResultTab, string> = {
   chart: 'Схема',
   functions: 'Функции',
   findings: 'Находки',
+  compliance: 'Требования',
   conclusion: 'Заключение'
 };
 
@@ -100,6 +102,7 @@ function ResultTabContent({ tab, result }: { tab: ResultTab; result: AnalysisRes
     return <FunctionTable result={result} unit={unit} onUnitChange={selectUnit} />;
   }
   if (tab === 'findings') return <FindingsList result={result} />;
+  if (tab === 'compliance') return <ComplianceView items={result.compliance ?? []} />;
   return <ConclusionView result={result} />;
 }
 
@@ -123,6 +126,13 @@ function emptyTabMessage(
       title: 'Функции не извлечены',
       description:
         'В документах не найдено пунктов с функциями подразделений, сопоставлять нечего. Проверьте, что загружены положения с разделом о функциях или обязанностях.'
+    };
+  }
+  if (tab === 'compliance' && (result.compliance ?? []).length === 0) {
+    return {
+      title: 'Сверка с внешними требованиями не выполнялась',
+      description:
+        'Пайплайн не вернул результатов сверки со стандартами IIA и законодательством об АО. Остальные вкладки доступны.'
     };
   }
   const { conclusion } = result;
