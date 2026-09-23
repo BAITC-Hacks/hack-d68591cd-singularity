@@ -1054,6 +1054,17 @@ function assemble({ parsed, structure, fns, matchRows, dupFindings, coi, afterRe
 
   for (const f of raw) {
     f.origin ??= 'new';
+    // Одна и та же пара «до → после» с разными пояснениями — показываем один раз, пояснения объединяем.
+    if (f.pairs) {
+      const byKey = new Map<string, EvidencePair>();
+      for (const pr of f.pairs) {
+        const k = `${pr.before?.side}:${pr.before?.docName}:${pr.before?.clauseId}|${pr.after?.side}:${pr.after?.docName}:${pr.after?.clauseId}`;
+        const prev = byKey.get(k);
+        if (!prev) byKey.set(k, { ...pr });
+        else if (pr.note && prev.note !== pr.note) prev.note = [prev.note, pr.note].filter(Boolean).join('; ');
+      }
+      f.pairs = [...byKey.values()];
+    }
     if (f.matchIds) f.matchIds = [...new Set(f.matchIds)];
     f.title = humanize(f.title);
     if (f.recommendation) f.recommendation = humanize(f.recommendation);
